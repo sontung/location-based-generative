@@ -277,14 +277,14 @@ def construct_weight_map(bbox):
         elif x_ < bbox[0]:
             weight_map[:, x_] *= (b_-a_)*x_/bbox[0]+a_
         elif x_ > bbox[2]:
-            weight_map[:, x_] *= (b_-a_)*(x_-bbox[2])/(128-bbox[2])+a_
+            weight_map[:, x_] *= (a_-b_)*(x_-bbox[2])/(128-bbox[2])+b_
     for x_ in range(weight_map.size(0)):
         if bbox[1] <= x_ <= bbox[3]:
             weight_map[x_, :] *= 1
         elif x_ < bbox[1]:
             weight_map[x_, :] *= (b_-a_)*x_/bbox[1]+a_
         elif x_ > bbox[3]:
-            weight_map[x_, :] *= (b_-a_)*(x_-bbox[3])/(128-bbox[3])+a_
+            weight_map[x_, :] *= (a_-b_)*(x_-bbox[3])/(128-bbox[3])+b_
     for x_ in range(weight_map.size(0)):
         for y_ in range(weight_map.size(0)):
             if bbox[0] <= x_ <= bbox[2] and bbox[1] <= y_ <= bbox[3]:
@@ -569,10 +569,4 @@ def kmeans(data_):
 
 
 if __name__ == '__main__':
-    from torch.utils.data import Dataset, DataLoader
-
-    train = PBW_AmbMasked()
-    train_iterator = DataLoader(PBWtransition(), batch_size=64, shuffle=True, collate_fn=collate_fn_trans)
-
-    for b in train_iterator:
-        print(b[0].size())
+    print(construct_weight_map([20, 30, 40, 50]))
