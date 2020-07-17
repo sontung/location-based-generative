@@ -2,42 +2,41 @@ from torch.utils.data import Dataset, DataLoader
 from data_loader import PBWtransition, collate_fn_trans, PBW, pbw_collate_fn
 from torchvision.utils import make_grid
 from models import RearrangeNetwork, LocationBasedGenerator, Transformer
-from utils import compute_grad
+from utils import compute_grad, show2
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-def show2(im_, name, nrow):
-    import logging
 
-    logger = logging.getLogger()
-    old_level = logger.level
-    logger.setLevel(100)
 
-    fig_ = plt.figure(figsize=(15, 15))
-    for du3 in range(1, len(im_)+1):
-        plt.subplot(1, len(im_), du3)
-        plt.axis("off")
-        plt.imshow(np.transpose(make_grid(im_[du3-1], padding=5, normalize=False, pad_value=50, nrow=nrow),
-                                (1, 2, 0)))
-
-    plt.axis("off")
-    # plt.title("black: no action, red: 1-3, yellow: 3-1, green: 1-2, blue: 2-3, pink: 3-2, brown: 2-1")
-    plt.savefig(name, transparent=True, bbox_inches='tight')
-    plt.close(fig_)
-    logger.setLevel(old_level)
+def eval(model_, iter_, name_=1, device_="cuda"):
+    total_loss = 0
+    vis = False
+    for idx, train_batch in enumerate(iter_):
+        start, coord_true, default, weight_maps = [tensor.to(device_) for tensor in train_batch]
+        loss, start_pred = model_(start, default, weight_maps)
+        total_loss += loss.item()
+        if not vis:
+            show2([
+                torch.sum(start, dim=1)[:16].cpu(),
+                torch.sum(start_pred, dim=1)[:16].detach().cpu(),
+                start_pred.detach().cpu().view(-1, 3, 128, 128)[:16]+start.cpu().view(-1, 3, 128, 128)[:16],
+            ], "figures/test%d.png" % name_, 4)
+            vis = True
+    return total_loss
 
 def train():
-    nb_epochs = 100
+    nb_epochs = 1000
     device = "cuda"
 
-    train = PBW()
-    train_iterator = DataLoader(train, batch_size=8, shuffle=True, collate_fn=pbw_collate_fn)
-
+    train_data = PBW()
+    train_iterator = DataLoader(train_data, batch_size=8, shuffle=True, collate_fn=pbw_collate_fn)
+    val_data = PBW(train=False)
+    val_iterator = DataLoader(val_data, batch_size=16, shuffle=False, collate_fn=pbw_collate_fn)
     model = LocationBasedGenerator()
     model.to(device)
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-1, weight_decay=1e-4)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
 
     for epc in range(nb_epochs):
 
@@ -45,20 +44,20 @@ def train():
         total_loss = 0
         for idx, train_batch in enumerate(train_iterator):
             optimizer.zero_grad()
-            start, coord_true, default = [tensor.to(device) for tensor in train_batch]
+            start, coord_true, default, weight_maps = [tensor.to(device) for tensor in train_batch]
 
-            loss, start_pred = model(start, default)
+            loss, start_pred = model(start, default, weight_maps)
             loss.backward()
 
             optimizer.step()
 
             total_loss += loss.item()
-        print(total_loss)
-        show2([
-            start[:16, :3, :].cpu(),
-            default[:16, :3, :].cpu(),
-            start_pred[:16].detach().cpu()
-        ], "test.png", 4)
+        # print(total_loss/len(train_data))
+
+        model.eval()
+        loss = eval(model, val_iterator, name_=epc)
+        print("val", loss/len(val_data))
+
 
 
 if __name__ == '__main__':

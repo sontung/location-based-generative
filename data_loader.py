@@ -27,9 +27,17 @@ class PBW(Dataset):
         self.image_dir = "%s/image" % root_dir
         self.transform = torchvision.transforms.ToTensor()
         self.transform_to_pil = torchvision.transforms.ToPILImage()
-        self.json2sg = {}
-        for js in self.scene_jsons:
-            self.json2sg[js] = read_scene_json(js)
+
+        if isfile("data/json2sg"):
+            print("Loading precomputed")
+            with open("data/json2sg", 'rb') as f:
+                self.json2sg = pickle.load(f)
+        else:
+            self.json2sg = {}
+            for js in self.scene_jsons:
+                self.json2sg[js] = read_scene_json(js)
+            with open("data/json2sg", 'wb') as f:
+                pickle.dump(self.json2sg, f, pickle.HIGHEST_PROTOCOL)
 
         self.json2im = self.load_json2im()
 
@@ -41,7 +49,9 @@ class PBW(Dataset):
         self.keys = list(self.data.keys())
         print("loaded", len(self.scene_jsons))
 
-    def load_json2im(self, nb_samples=5):
+    def load_json2im(self, nb_samples="all"):
+        if nb_samples == "all":
+            nb_samples = len(self.scene_jsons)
         name = "%s-%d-%d" % (self.root_dir.split("/")[-1], int(self.train), nb_samples)
         if isfile("data/%s" % name):
             print("Loading precomputed")
@@ -56,6 +66,7 @@ class PBW(Dataset):
                 img = self.transform(img_pil).unsqueeze(0)
                 all_inp = []
                 original_inp = []
+                weight_maps = []
                 for bbox in bboxes:
                     mask_im = torch.zeros_like(img)
                     default_inp = torch.zeros_like(img)
@@ -69,12 +80,14 @@ class PBW(Dataset):
                         for j_, y_ in enumerate(range(int(bbox[1]), int(bbox[3])+1)):
                                 default_inp[:, :, j_+128-int(-bbox[1]+bbox[3]+1), i_] = img[:, :, y_, x_]
 
-                    all_inp.append(torch.cat([mask_im, img], dim=1))
+                    all_inp.append(mask_im)
                     original_inp.append(default_inp)
+                    weight_maps.append(construct_weight_map(bbox))
 
                 targets = torch.from_numpy(np.array(coords)).float().flatten()
-                all_inp = torch.cat(all_inp, dim=0)
-                original_inp = torch.cat(original_inp, dim=0)
+                all_inp = torch.cat(all_inp, dim=0).unsqueeze(0)
+                original_inp = torch.cat(original_inp, dim=0).unsqueeze(0)
+                weight_maps = torch.cat(weight_maps, dim=0).unsqueeze(0)
 
                 try:
                     assert check(recon_sg2(self.scene_jsons[item]), recon_sg(obj_names, coords))
@@ -83,9 +96,9 @@ class PBW(Dataset):
                         print("%dnd try"%du)
                         recon_sg(obj_names, coords)
                     sys.exit()
-                res_dict[self.scene_jsons[item]] = (all_inp, targets, original_inp)
-            # with open("data/%s" % name, 'wb') as f:
-            #     pickle.dump(res_dict, f, pickle.HIGHEST_PROTOCOL)
+                res_dict[self.scene_jsons[item]] = (all_inp, targets, original_inp, weight_maps)
+            with open("data/%s" % name, 'wb') as f:
+                pickle.dump(res_dict, f, pickle.HIGHEST_PROTOCOL)
             return res_dict
 
     def __len__(self):
@@ -94,6 +107,76 @@ class PBW(Dataset):
     def __getitem__(self, item):
         return self.data[self.keys[item]]
 
+class PBW_AmbMasked(Dataset):
+    def __init__(self, root_dir="/home/sontung/thesis/photorealistic-blocksworld/blocks-6-3",
+                 train=True, train_size=0.7):
+        super(PBW_AmbMasked, self).__init__()
+        self.root_dir = root_dir
+        self.train = train
+
+        json_dir = "%s/scene" % root_dir
+        self.scene_jsons = [join(json_dir, f) for f in listdir(json_dir) if isfile(join(json_dir, f))]
+
+        self.image_dir = "%s/image" % root_dir
+        self.transform = torchvision.transforms.ToTensor()
+        self.transform_to_pil = torchvision.transforms.ToPILImage()
+        self.json2sg = {}
+        for js in self.scene_jsons:
+            self.json2sg[js] = read_scene_json(js, return_top_objects=True)
+
+        self.json2im = self.load_json2im()
+
+        keys = list(self.json2im.keys())
+        if train:
+            self.data = {du3: self.json2im[du3] for du3 in keys[:int(len(keys)*train_size)]}
+        else:
+            self.data = {du3: self.json2im[du3] for du3 in keys[int(len(keys)*train_size):]}
+        self.keys = list(self.data.keys())
+        print("loaded", len(self.scene_jsons))
+
+    def load_json2im(self, nb_samples=1000):
+        name = "%s-%d-%d" % (self.root_dir.split("/")[-1], int(self.train), nb_samples)
+        if isfile("data/%s" % name):
+            print("Loading precomputed")
+            with open("data/%s" % name, 'rb') as f:
+                return pickle.load(f)
+        else:
+            res_dict = {}
+            for item in range(len(self.scene_jsons))[:nb_samples]:
+                bboxes, coords, obj_names, img_name, mask_values, top_objects = self.json2sg[self.scene_jsons[item]]
+
+                img_pil = Image.open("%s/%s" % (self.image_dir, img_name)).convert('RGB')
+                img = self.transform(img_pil).unsqueeze(0)
+
+                mask_im = torch.zeros_like(img)[0, :, :]
+                for dm1, bbox in enumerate(bboxes):
+
+                    for x_ in range(mask_im.size(2)):
+                        for y_ in range(mask_im.size(2)):
+                            if bbox[0] <= x_ <= bbox[2] and bbox[1] <= y_ <= bbox[3]:
+                                mask_im[:, :, y_, x_] = mask_values[dm1]
+
+                targets = torch.zeros(1, len(obj_names))
+                targets[:, top_objects] = 1
+                targets = targets.squeeze()
+
+                try:
+                    assert check(recon_sg2(self.scene_jsons[item]), recon_sg(obj_names, coords))
+                except AssertionError:
+                    for du in range(10):
+                        print("%dnd try"%du)
+                        recon_sg(obj_names, coords)
+                    sys.exit()
+                res_dict[self.scene_jsons[item]] = (mask_im, targets, img)
+            with open("data/%s" % name, 'wb') as f:
+                pickle.dump(res_dict, f, pickle.HIGHEST_PROTOCOL)
+            return res_dict
+
+    def __len__(self):
+        return len(self.keys)
+
+    def __getitem__(self, item):
+        return self.data[self.keys[item]]
 
 class PBWtransition(Dataset):
     def __init__(self, transition_dir="/home/sontung/thesis/photorealistic-blocksworld/blocks-6-3/image_tr",
@@ -183,6 +266,33 @@ class PBWtransition(Dataset):
         act_onehot = torch.zeros(6)
         act_onehot[self.action_list[act]] = 1
         return self.name2im[start], act_onehot, self.name2im[end]
+
+def construct_weight_map(bbox):
+    weight_map = torch.ones(128, 128)
+    a_ = 255
+    b_ = 1
+    for x_ in range(weight_map.size(0)):
+        if bbox[0] <= x_ <= bbox[2]:
+            weight_map[:, x_] *= 1
+        elif x_ < bbox[0]:
+            weight_map[:, x_] *= (b_-a_)*x_/bbox[0]+a_
+        elif x_ > bbox[2]:
+            weight_map[:, x_] *= (b_-a_)*(x_-bbox[2])/(128-bbox[2])+a_
+    for x_ in range(weight_map.size(0)):
+        if bbox[1] <= x_ <= bbox[3]:
+            weight_map[x_, :] *= 1
+        elif x_ < bbox[1]:
+            weight_map[x_, :] *= (b_-a_)*x_/bbox[1]+a_
+        elif x_ > bbox[3]:
+            weight_map[x_, :] *= (b_-a_)*(x_-bbox[3])/(128-bbox[3])+a_
+    for x_ in range(weight_map.size(0)):
+        for y_ in range(weight_map.size(0)):
+            if bbox[0] <= x_ <= bbox[2] and bbox[1] <= y_ <= bbox[3]:
+                weight_map[y_, x_] = 0
+            else:
+                weight_map[y_, x_] = torch.sqrt(weight_map[y_, x_])
+
+    return weight_map.unsqueeze(0)
 
 def read_scene_json2(json_file_dir):
     with open(json_file_dir, 'r') as json_file:
@@ -287,16 +397,19 @@ def check(d1, d2):
     return True
 
 def pbw_collate_fn(batch):
-    all_imgs, all_targets, all_imgs2 = [], [], []
-    for i, (inp, tar, inp2) in enumerate(batch):
+    all_imgs, all_targets, all_imgs2, weights = [], [], [], []
+    for i, (inp, tar, inp2, w) in enumerate(batch):
         all_imgs.append(inp)
         all_imgs2.append(inp2)
         all_targets.append(tar.unsqueeze(0))
+        weights.append(w)
 
     all_imgs = torch.cat(all_imgs)
     all_imgs2 = torch.cat(all_imgs2)
     all_targets = torch.cat(all_targets)
-    return all_imgs, all_targets, all_imgs2
+    weights = torch.cat(weights)
+
+    return all_imgs, all_targets, all_imgs2, weights
 
 def collate_fn_trans(batch):
     all_imgs1, all_imgs2, all_act = [], [], []
@@ -370,7 +483,22 @@ def evaluation2(iter_, model, loss_func, device="cuda"):
         val_loss.append(loss.item())
     return np.mean(val_loss)
 
-def read_scene_json(json_file_dir):
+def find_top(up_rel, ob_start):
+    rel_res = None
+    while True:
+        done = True
+        for rel in up_rel:
+            if rel[2] == ob_start:
+                ob_start = rel[0]
+                done = False
+                rel_res = rel
+                break
+        if done:
+            return ob_start, rel_res
+
+def read_scene_json(json_file_dir, return_top_objects=False):
+    from random import shuffle
+
     id2color = {
         "gray": [87, 87, 87],
         "red": [173, 35, 35],
@@ -407,7 +535,16 @@ def read_scene_json(json_file_dir):
             obj["bbox"][3],
         ])
         locations.append([obj["location"][0], obj["location"][2]])
+    sg = recon_sg(objects, locations)
 
+    up_rel = [rel for rel in sg if rel[1] == "up"]
+    values_for_masks = [dm1+1 for dm1 in list(range(len(objects)))]
+    shuffle(values_for_masks)
+    obID2mask_value = {objects[dm3]: values_for_masks[dm3] for dm3 in range(len(objects))}
+    ob_mask_value = [obID2mask_value[dm4] for dm4 in objects]
+    top_obj_ids = [obID2mask_value[find_top(up_rel, du)[0]]-1 for du in ["brown", "purple", "cyan"]]
+    if return_top_objects:
+        return bboxes, locations, objects, du["image_filename"], ob_mask_value, top_obj_ids
     return bboxes, locations, objects, du["image_filename"]
 
 def kmeans(data_):
@@ -434,7 +571,7 @@ def kmeans(data_):
 if __name__ == '__main__':
     from torch.utils.data import Dataset, DataLoader
 
-    train = PBWtransition()
+    train = PBW_AmbMasked()
     train_iterator = DataLoader(PBWtransition(), batch_size=64, shuffle=True, collate_fn=collate_fn_trans)
 
     for b in train_iterator:
