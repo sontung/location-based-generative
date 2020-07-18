@@ -5,6 +5,7 @@ import numpy as np
 import pickle
 import time
 import random
+import math
 import sys
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
@@ -16,7 +17,7 @@ from PIL import Image
 
 class PBW(Dataset):
     def __init__(self, root_dir="/home/sontung/thesis/photorealistic-blocksworld/blocks-6-3",
-                 train=True, train_size=0.7):
+                 train=True, train_size=0.6):
         super(PBW, self).__init__()
         self.root_dir = root_dir
         self.train = train
@@ -49,10 +50,10 @@ class PBW(Dataset):
         self.keys = list(self.data.keys())
         print("loaded", len(self.scene_jsons))
 
-    def load_json2im(self, nb_samples="all"):
+    def load_json2im(self, nb_samples=1000):
         if nb_samples == "all":
             nb_samples = len(self.scene_jsons)
-        name = "%s-%d-%d" % (self.root_dir.split("/")[-1], int(self.train), nb_samples)
+        name = "%s-%d" % (self.root_dir.split("/")[-1], nb_samples)
         if isfile("data/%s" % name):
             print("Loading precomputed")
             with open("data/%s" % name, 'rb') as f:
@@ -61,42 +62,43 @@ class PBW(Dataset):
             res_dict = {}
             for item in range(len(self.scene_jsons))[:nb_samples]:
                 bboxes, coords, obj_names, img_name = self.json2sg[self.scene_jsons[item]]
+                sg = recon_sg2(self.scene_jsons[item])
 
                 img_pil = Image.open("%s/%s" % (self.image_dir, img_name)).convert('RGB')
                 img = self.transform(img_pil).unsqueeze(0)
                 all_inp = []
                 original_inp = []
                 weight_maps = []
+
                 for bbox in bboxes:
                     mask_im = torch.zeros_like(img)
                     default_inp = torch.zeros_like(img)
 
-                    for x_ in range(mask_im.size(2)):
-                        for y_ in range(mask_im.size(2)):
-                            if bbox[0] <= x_ <= bbox[2] and bbox[1] <= y_ <= bbox[3]:
-                                mask_im[:, :, y_, x_] = img[:, :, y_, x_]
+                    bbox_int = [int(dm11) for dm11 in bbox]
 
-                    for i_, x_ in enumerate(range(int(bbox[0]), int(bbox[2])+1)):
-                        for j_, y_ in enumerate(range(int(bbox[1]), int(bbox[3])+1)):
-                                default_inp[:, :, j_+128-int(-bbox[1]+bbox[3]+1), i_] = img[:, :, y_, x_]
+                    # masked the image
+                    for x_ in range(bbox_int[0], bbox_int[2]+1):
+                        idc = range(bbox_int[1], bbox_int[3]+1)
+                        mask_im[:, :, idc, x_] = img[:, :, idc, x_]
+
+                    # place the mask at the origin
+                    idc1 = range(bbox_int[0], bbox_int[2]+1)
+                    idc2 = range(len(idc1))
+                    for j_, y_ in enumerate(range(bbox_int[1], bbox_int[3]+1)):
+                        default_inp[:, :, j_+128-int(-bbox[1]+bbox[3]+1), idc2] = img[:, :, y_, idc1]
+
+                    weight = construct_weight_map(bbox)
 
                     all_inp.append(mask_im)
                     original_inp.append(default_inp)
-                    weight_maps.append(construct_weight_map(bbox))
+                    weight_maps.append(weight)
 
                 targets = torch.from_numpy(np.array(coords)).float().flatten()
                 all_inp = torch.cat(all_inp, dim=0).unsqueeze(0)
                 original_inp = torch.cat(original_inp, dim=0).unsqueeze(0)
                 weight_maps = torch.cat(weight_maps, dim=0).unsqueeze(0)
 
-                try:
-                    assert check(recon_sg2(self.scene_jsons[item]), recon_sg(obj_names, coords))
-                except AssertionError:
-                    for du in range(10):
-                        print("%dnd try"%du)
-                        recon_sg(obj_names, coords)
-                    sys.exit()
-                res_dict[self.scene_jsons[item]] = (all_inp, targets, original_inp, weight_maps)
+                res_dict[self.scene_jsons[item]] = (all_inp, targets, original_inp, weight_maps, sg, obj_names)
             with open("data/%s" % name, 'wb') as f:
                 pickle.dump(res_dict, f, pickle.HIGHEST_PROTOCOL)
             return res_dict
@@ -271,27 +273,21 @@ def construct_weight_map(bbox):
     weight_map = torch.ones(128, 128)
     a_ = 255
     b_ = 1
-    for x_ in range(weight_map.size(0)):
-        if bbox[0] <= x_ <= bbox[2]:
-            weight_map[:, x_] *= 1
-        elif x_ < bbox[0]:
-            weight_map[:, x_] *= (b_-a_)*x_/bbox[0]+a_
-        elif x_ > bbox[2]:
-            weight_map[:, x_] *= (a_-b_)*(x_-bbox[2])/(128-bbox[2])+b_
-    for x_ in range(weight_map.size(0)):
-        if bbox[1] <= x_ <= bbox[3]:
-            weight_map[x_, :] *= 1
-        elif x_ < bbox[1]:
-            weight_map[x_, :] *= (b_-a_)*x_/bbox[1]+a_
-        elif x_ > bbox[3]:
-            weight_map[x_, :] *= (a_-b_)*(x_-bbox[3])/(128-bbox[3])+b_
-    for x_ in range(weight_map.size(0)):
-        for y_ in range(weight_map.size(0)):
-            if bbox[0] <= x_ <= bbox[2] and bbox[1] <= y_ <= bbox[3]:
-                weight_map[y_, x_] = 0
-            else:
-                weight_map[y_, x_] = torch.sqrt(weight_map[y_, x_])
+    bbox_int = [int(dm11) for dm11 in bbox]
 
+    weight_map[:, range(0, bbox_int[0]+1)] *= torch.tensor([(b_-a_)*x_/bbox[0]+a_ for x_ in range(0, bbox_int[0]+1)])
+    weight_map[:, range(bbox_int[2], 128)] *= torch.tensor([(a_-b_)*(x_-bbox[2])/(128-bbox[2])+b_ for x_ in range(bbox_int[2], 128)])
+
+    for x_ in range(0, bbox_int[1]+1):
+        weight_map[x_, :] *= (b_-a_)*x_/bbox[1]+a_
+    for x_ in range(bbox_int[3], 128):
+        weight_map[x_, :] *= (a_-b_)*(x_-bbox[3])/(128-bbox[3])+b_
+
+    for x_ in range(bbox_int[0], bbox_int[2] + 1):
+        for y_ in range(bbox_int[1], bbox_int[3] + 1):
+            weight_map[y_, x_] = 0
+
+    weight_map = torch.sqrt(weight_map)
     return weight_map.unsqueeze(0)
 
 def read_scene_json2(json_file_dir):
@@ -398,18 +394,22 @@ def check(d1, d2):
 
 def pbw_collate_fn(batch):
     all_imgs, all_targets, all_imgs2, weights = [], [], [], []
-    for i, (inp, tar, inp2, w) in enumerate(batch):
+    sgs = []
+    names = []
+    for i, (inp, tar, inp2, w, sg, name) in enumerate(batch):
         all_imgs.append(inp)
         all_imgs2.append(inp2)
         all_targets.append(tar.unsqueeze(0))
         weights.append(w)
+        sgs.append(sg)
+        names.append(name)
 
     all_imgs = torch.cat(all_imgs)
     all_imgs2 = torch.cat(all_imgs2)
     all_targets = torch.cat(all_targets)
     weights = torch.cat(weights)
 
-    return all_imgs, all_targets, all_imgs2, weights
+    return all_imgs, all_targets, all_imgs2, weights, sgs, names
 
 def collate_fn_trans(batch):
     all_imgs1, all_imgs2, all_act = [], [], []

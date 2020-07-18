@@ -4,7 +4,7 @@ import torch
 import torchvision
 import torch.nn.functional as F
 import torchvision.models as models
-
+from utils import recon_sg
 from PIL import Image
 
 
@@ -135,6 +135,19 @@ class LocationBasedGenerator(nn.Module):
         theta = self.find_theta(x)
         x_pred = self.transform(x_default, theta)
         return x_pred
+
+    def return_sg(self, x, ob_names):
+        nb_objects = x.size(1)
+        batch_size = x.size(0)
+        x = x.view(-1, 3, 128, 128)
+        theta = self.find_theta(x).view(batch_size, nb_objects, 6)
+        trans_vec = theta[:, :, [2, 5]]
+        trans_vec[:, :, 0] *= -1
+        res = []
+        for i in range(batch_size):
+            sg = recon_sg(ob_names[i], trans_vec[i])
+            res.append(sg)
+        return res
 
     def forward(self, x, x_default, weights):
         nb_objects = x.size(1)

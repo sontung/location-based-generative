@@ -8,25 +8,34 @@ import numpy as np
 import torch
 
 
-
 def eval(model_, iter_, name_=1, device_="cuda"):
     total_loss = 0
     vis = False
+    correct = 0
     for idx, train_batch in enumerate(iter_):
-        start, coord_true, default, weight_maps = [tensor.to(device_) for tensor in train_batch]
-        loss, start_pred = model_(start, default, weight_maps)
+        start, coord_true, default, weight_maps = [tensor.to(device_) for tensor in train_batch[:4]]
+        graphs, ob_names = train_batch[4:]
+        with torch.no_grad():
+            loss, start_pred = model_(start, default, weight_maps)
+            pred_sg = model_.return_sg(start, ob_names)
         total_loss += loss.item()
+        for i in range(len(graphs)):
+            correct += sorted(graphs[i]) == sorted(pred_sg[i])
+        # print(graphs[0], "\n", pred_sg[0], "\n")
+
         if not vis:
             show2([
                 torch.sum(start, dim=1)[:16].cpu(),
                 torch.sum(start_pred, dim=1)[:16].detach().cpu(),
                 start_pred.detach().cpu().view(-1, 3, 128, 128)[:16]+start.cpu().view(-1, 3, 128, 128)[:16],
+                default.cpu().view(-1, 3, 128, 128)[:16],
+                weight_maps.cpu().view(-1, 1, 128, 128)[:16]
             ], "figures/test%d.png" % name_, 4)
             vis = True
-    return total_loss
+    return total_loss, correct
 
 def train():
-    nb_epochs = 1000
+    nb_epochs = 100
     device = "cuda"
 
     train_data = PBW()
@@ -44,7 +53,8 @@ def train():
         total_loss = 0
         for idx, train_batch in enumerate(train_iterator):
             optimizer.zero_grad()
-            start, coord_true, default, weight_maps = [tensor.to(device) for tensor in train_batch]
+            start, coord_true, default, weight_maps = [tensor.to(device) for tensor in train_batch[:4]]
+            graphs, ob_names = train_batch[4:]
 
             loss, start_pred = model(start, default, weight_maps)
             loss.backward()
@@ -55,8 +65,8 @@ def train():
         # print(total_loss/len(train_data))
 
         model.eval()
-        loss = eval(model, val_iterator, name_=epc)
-        print("val", loss/len(val_data))
+        loss, acc = eval(model, val_iterator, name_=epc)
+        print("val", loss/len(val_data), acc/len(val_data))
 
 
 
