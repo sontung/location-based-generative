@@ -55,7 +55,7 @@ def train():
     now = datetime.datetime.now()
     writer = SummaryWriter("logs/" + now.strftime("%Y%m%d-%H%M%S") + "/")
 
-    nb_epochs = 100
+    nb_epochs = 20
     device = DEVICE
 
     train_data = PBW(root_dir=ROOT_DIR, nb_samples=NB_SAMPLES)
@@ -89,11 +89,11 @@ def train():
         loss, acc = eval(model, val_iterator, name_=str(epc), device_=device)
         writer.add_scalar('val/loss', loss/len(val_data), epc)
         writer.add_scalar('val/acc', acc/len(val_data), epc)
-        print(epc, loss, acc)
+        print(epc, acc/len(val_data))
         loss, acc = eval(model, val_iterator2, name_="-d-"+str(epc), device_=device)
         writer.add_scalar('val2/loss', loss / len(val_data2), epc)
         writer.add_scalar('val2/acc', acc / len(val_data2), epc)
-        print(epc, loss, acc)
+        print(epc, acc / len(val_data2))
 
 
     torch.save(model.state_dict(), "model-%s" % now.strftime("%Y%m%d-%H%M%S"))
