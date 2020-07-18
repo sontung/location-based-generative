@@ -49,25 +49,37 @@ def recon_sg(obj_names, locations, if_return_assigns=False):
     for idx, object_id in enumerate(obj_names):
         a_key = k_means_assign[idx]
         if a_key not in location_dict:
-            location_dict[a_key] = [(object_id, locations[idx][1])]
+            location_dict[a_key] = [(object_id, locations[idx][1], locations[idx][0])]
         else:
-            location_dict[a_key].append((object_id, locations[idx][1]))
+            location_dict[a_key].append((object_id, locations[idx][1], locations[idx][0]))
         objects.append(object_id)
-    relationships = [
-        ["brown", "left", "purple"],
-        ["purple", "left", "cyan"],
-    ]
+    relationships = []
+
+    # decide up relation
+    bottoms = []
     for du3 in location_dict:
         location = sorted(location_dict[du3], key=lambda x: x[1])
+        bottoms.append(location[0])
         while len(location) > 1:
             o1 = location.pop()[0]
             o2 = location[-1][0]
             relationships.append([o1, "up", o2])
+
+    # decide left relation
+    bottoms = sorted(bottoms, key=lambda x: x[2])
+    relationships.append([bottoms[0][0], "left", bottoms[1][0]])
+    relationships.append([bottoms[1][0], "left", bottoms[2][0]])
+
     if if_return_assigns:
         return relationships, k_means_assign
     return relationships
 
 def kmeans(data_):
+    """
+    assign each object one of 3 block IDs based on the x coord
+    :param data_:
+    :return:
+    """
     c1 = max(data_)
     c2 = min(data_)
     c3 = (c1+c2)/2

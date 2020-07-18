@@ -60,7 +60,7 @@ def train():
 
     train_data = PBW(root_dir=ROOT_DIR, nb_samples=NB_SAMPLES)
     train_iterator = DataLoader(train_data, batch_size=8, shuffle=True, collate_fn=pbw_collate_fn)
-    val_data = PBW(train=False, root_dir=ROOT_DIR, nb_samples=NB_SAMPLES)
+    val_data = PBW(train=False, root_dir=ROOT_DIR, nb_samples=NB_SAMPLES, json2im=train_data.json2im)
     val_iterator = DataLoader(val_data, batch_size=16, shuffle=False, collate_fn=pbw_collate_fn)
     val_data2 = PBW(train=False, root_dir=EVAL_DIR, train_size=0.0, nb_samples=NB_SAMPLES)
     val_iterator2 = DataLoader(val_data2, batch_size=16, shuffle=False, collate_fn=pbw_collate_fn)

@@ -17,7 +17,7 @@ from PIL import Image
 
 class PBW(Dataset):
     def __init__(self, root_dir="/home/sontung/thesis/photorealistic-blocksworld/blocks-6-3",
-                 train=True, train_size=0.6, nb_samples=1000):
+                 train=True, train_size=0.6, nb_samples=1000, json2im=None):
         print("Loading from", root_dir)
         super(PBW, self).__init__()
         self.root_dir = root_dir
@@ -42,7 +42,10 @@ class PBW(Dataset):
             with open("data/json2sg-%s" % identifier, 'wb') as f:
                 pickle.dump(self.json2sg, f, pickle.HIGHEST_PROTOCOL)
 
-        self.json2im = self.load_json2im(nb_samples=nb_samples)
+        if json2im is None:
+            self.json2im = self.load_json2im(nb_samples=nb_samples)
+        else:
+            self.json2im = json2im
 
         keys = list(self.json2im.keys())
         if train:

@@ -6,6 +6,7 @@ __pycache__/
 data/
 figures/
 logs/
+pre_models/
 
 # C extensions
 *.so
