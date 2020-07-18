@@ -17,10 +17,12 @@ from PIL import Image
 
 class PBW(Dataset):
     def __init__(self, root_dir="/home/sontung/thesis/photorealistic-blocksworld/blocks-6-3",
-                 train=True, train_size=0.6):
+                 train=True, train_size=0.6, nb_samples=1000):
+        print("Loading from", root_dir)
         super(PBW, self).__init__()
         self.root_dir = root_dir
         self.train = train
+        identifier = root_dir.split("/")[-1]
 
         json_dir = "%s/scene" % root_dir
         self.scene_jsons = [join(json_dir, f) for f in listdir(json_dir) if isfile(join(json_dir, f))]
@@ -29,18 +31,18 @@ class PBW(Dataset):
         self.transform = torchvision.transforms.ToTensor()
         self.transform_to_pil = torchvision.transforms.ToPILImage()
 
-        if isfile("data/json2sg"):
-            print("Loading precomputed")
-            with open("data/json2sg", 'rb') as f:
+        if isfile("data/json2sg-%s" % identifier):
+            print("Loading precomputed json2sg:", "data/json2sg-%s" % identifier)
+            with open("data/json2sg-%s" % identifier, 'rb') as f:
                 self.json2sg = pickle.load(f)
         else:
             self.json2sg = {}
             for js in self.scene_jsons:
                 self.json2sg[js] = read_scene_json(js)
-            with open("data/json2sg", 'wb') as f:
+            with open("data/json2sg-%s" % identifier, 'wb') as f:
                 pickle.dump(self.json2sg, f, pickle.HIGHEST_PROTOCOL)
 
-        self.json2im = self.load_json2im()
+        self.json2im = self.load_json2im(nb_samples=nb_samples)
 
         keys = list(self.json2im.keys())
         if train:
@@ -48,14 +50,14 @@ class PBW(Dataset):
         else:
             self.data = {du3: self.json2im[du3] for du3 in keys[int(len(keys)*train_size):]}
         self.keys = list(self.data.keys())
-        print("loaded", len(self.scene_jsons))
+        print("loaded", len(self.json2im))
 
     def load_json2im(self, nb_samples=1000):
-        if nb_samples == "all":
+        if nb_samples < 0:
             nb_samples = len(self.scene_jsons)
         name = "%s-%d" % (self.root_dir.split("/")[-1], nb_samples)
         if isfile("data/%s" % name):
-            print("Loading precomputed")
+            print("Loading precomputed json2im:", "data/%s" % name)
             with open("data/%s" % name, 'rb') as f:
                 return pickle.load(f)
         else:

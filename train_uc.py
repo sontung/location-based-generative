@@ -6,9 +6,27 @@ from utils import compute_grad, show2
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+import argparse
+import datetime
+from torch.utils.tensorboard import SummaryWriter
 
 
-def eval(model_, iter_, name_=1, device_="cuda"):
+PARSER = argparse.ArgumentParser()
+PARSER.add_argument("--dir", help="train directory",
+                    default="/scratch/mlr/nguyensg/pbw/blocks-6-3", type=str)
+PARSER.add_argument("--eval_dir", help="2nd domain evaluation directory",
+                    default="/scratch/mlr/nguyensg/pbw/blocks-5-3", type=str)
+PARSER.add_argument("--nb_samples", help="how many samples", default=1000, type=int)
+PARSER.add_argument("--device", help="gpu device", default=0, type=int)
+
+MY_ARGS = PARSER.parse_args()
+
+NB_SAMPLES = MY_ARGS.nb_samples
+ROOT_DIR = MY_ARGS.dir
+EVAL_DIR = MY_ARGS.eval_dir
+DEVICE = "cuda:%d" % MY_ARGS.device
+
+def eval(model_, iter_, name_="1", device_="cuda"):
     total_loss = 0
     vis = False
     correct = 0
@@ -21,7 +39,6 @@ def eval(model_, iter_, name_=1, device_="cuda"):
         total_loss += loss.item()
         for i in range(len(graphs)):
             correct += sorted(graphs[i]) == sorted(pred_sg[i])
-        # print(graphs[0], "\n", pred_sg[0], "\n")
 
         if not vis:
             show2([
@@ -30,18 +47,23 @@ def eval(model_, iter_, name_=1, device_="cuda"):
                 start_pred.detach().cpu().view(-1, 3, 128, 128)[:16]+start.cpu().view(-1, 3, 128, 128)[:16],
                 default.cpu().view(-1, 3, 128, 128)[:16],
                 weight_maps.cpu().view(-1, 1, 128, 128)[:16]
-            ], "figures/test%d.png" % name_, 4)
+            ], "figures/test%s.png" % name_, 4)
             vis = True
     return total_loss, correct
 
 def train():
-    nb_epochs = 100
-    device = "cuda"
+    now = datetime.datetime.now()
+    writer = SummaryWriter("logs/" + now.strftime("%Y%m%d-%H%M%S") + "/")
 
-    train_data = PBW()
+    nb_epochs = 100
+    device = DEVICE
+
+    train_data = PBW(root_dir=ROOT_DIR, nb_samples=NB_SAMPLES)
     train_iterator = DataLoader(train_data, batch_size=8, shuffle=True, collate_fn=pbw_collate_fn)
-    val_data = PBW(train=False)
+    val_data = PBW(train=False, root_dir=ROOT_DIR, nb_samples=NB_SAMPLES)
     val_iterator = DataLoader(val_data, batch_size=16, shuffle=False, collate_fn=pbw_collate_fn)
+    val_data2 = PBW(train=False, root_dir=EVAL_DIR, train_size=0.0, nb_samples=NB_SAMPLES)
+    val_iterator2 = DataLoader(val_data2, batch_size=16, shuffle=False, collate_fn=pbw_collate_fn)
     model = LocationBasedGenerator()
     model.to(device)
 
@@ -54,7 +76,6 @@ def train():
         for idx, train_batch in enumerate(train_iterator):
             optimizer.zero_grad()
             start, coord_true, default, weight_maps = [tensor.to(device) for tensor in train_batch[:4]]
-            graphs, ob_names = train_batch[4:]
 
             loss, start_pred = model(start, default, weight_maps)
             loss.backward()
@@ -62,11 +83,20 @@ def train():
             optimizer.step()
 
             total_loss += loss.item()
-        # print(total_loss/len(train_data))
+        writer.add_scalar('train/loss', total_loss/len(train_data), epc)
 
         model.eval()
-        loss, acc = eval(model, val_iterator, name_=epc)
-        print("val", loss/len(val_data), acc/len(val_data))
+        loss, acc = eval(model, val_iterator, name_=str(epc), device_=device)
+        writer.add_scalar('val/loss', loss/len(val_data), epc)
+        writer.add_scalar('val/acc', acc/len(val_data), epc)
+        print(epc, loss, acc)
+        loss, acc = eval(model, val_iterator2, name_="-d-"+str(epc), device_=device)
+        writer.add_scalar('val2/loss', loss / len(val_data2), epc)
+        writer.add_scalar('val2/acc', acc / len(val_data2), epc)
+        print(epc, loss, acc)
+
+
+    torch.save(model.state_dict(), "model-%s" % now.strftime("%Y%m%d-%H%M%S"))
 
 
 
