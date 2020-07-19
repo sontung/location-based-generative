@@ -1,5 +1,7 @@
 import torch
 import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use('Agg')
 import numpy as np
 from torchvision.utils import make_grid
 
@@ -69,7 +71,6 @@ def recon_sg(obj_names, locations, if_return_assigns=False):
     bottoms = sorted(bottoms, key=lambda x: x[2])
     relationships.append([bottoms[0][0], "left", bottoms[1][0]])
     relationships.append([bottoms[1][0], "left", bottoms[2][0]])
-
     if if_return_assigns:
         return relationships, k_means_assign
     return relationships

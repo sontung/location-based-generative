@@ -1,11 +1,20 @@
 import utils
+import os
+import random
+import sys
+import torchvision
+import torch
+import pickle
+from PIL import Image
 from queue import Queue
-
+from models import LocationBasedGenerator
+from data_loader import PBW_Planning_only
+from utils import show2
 
 class Node:
-    def __init__(self, sg):
+    def __init__(self, sg, ob_names):
         self.sg = sg
-        self.key = hash_sg(sg)
+        self.key = hash_sg(sg, ob_names)
         self.visited = False
         self.parent = None
         self.act = None
@@ -68,11 +77,17 @@ def possible_next_states(current_state):
     return res
 
 
-def hash_sg(relationships):
+def hash_sg(relationships, ob_names):
+    """
+    hash into unique ID
+    :param relationships: [['brown', 'left', 'purple'] , ['yellow', 'up', 'yellow']]
+    :param ob_names:
+    :return:
+    """
     a_key = [0]*64
     pred2id = {"none": 0, "left": 1, "up": 2}
-    predefined_objects1 = ['brown', 'purple', 'cyan', 'red', 'green', 'yellow', 'blue', 'gray']
-    predefined_objects2 = ['brown', 'purple', 'cyan', 'red', 'green', 'yellow', 'blue', 'gray']
+    predefined_objects1 = ob_names[:]
+    predefined_objects2 = ob_names[:]
     pair2pred = {}
     for rel in relationships:
         if rel[1] != "__in_image__":
@@ -87,9 +102,9 @@ def hash_sg(relationships):
     return tuple(a_key)
 
 
-def inv_hash_sg(a_key):
-    predefined_objects1 = ['brown', 'purple', 'cyan', 'red', 'green', 'yellow', 'blue', 'gray']
-    predefined_objects2 = ['brown', 'purple', 'cyan', 'red', 'green', 'yellow', 'blue', 'gray']
+def inv_hash_sg(a_key, ob_names):
+    predefined_objects1 = ob_names[:]
+    predefined_objects2 = ob_names[:]
     id2pred = {0: "none", 1: "left", 2: "up"}
 
     sg = []
@@ -102,11 +117,11 @@ def inv_hash_sg(a_key):
     return sg
 
 
-def plan(start_sg, end_sg):
+def plan(start_sg, end_sg, ob_names):
     # bfs
     Q = Queue()
-    start_v = Node(start_sg)
-    goal_state = Node(end_sg)
+    start_v = Node(start_sg, ob_names)
+    goal_state = Node(end_sg, ob_names)
     all_nodes = {start_v.get_key(): start_v, goal_state.get_key(): goal_state}
     start_v.visited = True
     Q.put(start_v)
@@ -116,9 +131,9 @@ def plan(start_sg, end_sg):
             print("search is completed")
             break
         for w, act in possible_next_states(v.get_sg()):
-            w_key = hash_sg(w)
+            w_key = hash_sg(w, ob_names)
             if w_key not in all_nodes:
-                all_nodes[w_key] = Node(w)
+                all_nodes[w_key] = Node(w, ob_names)
             if not all_nodes[w_key].visited:
                 all_nodes[w_key].visited = True
                 all_nodes[w_key].parent = v
@@ -135,14 +150,59 @@ def plan(start_sg, end_sg):
         goal_state = goal_state.parent
     return traces, actions
 
+def visulize_plan(im_list):
+    im_tensors = []
+    transform = torchvision.transforms.ToTensor()
+    for im_name in im_list:
+        im_tensors.append(transform(Image.open(im_name).convert('RGB')).unsqueeze(0))
+    im_tensors = torch.cat(im_tensors, dim=0)
+    show2([im_tensors], "solution", 9)
+
+
+def randomly_choose_images(model_, device="cuda", name="blocks-5-3-2520-planning", domain_task="blocks-5-3",
+                           nb_objects=8):
+    _ = PBW_Planning_only(root_dir="/home/sontung/thesis/photorealistic-blocksworld/%s" % domain_task, nb_samples=-1)
+    ob_names = ['brown', 'purple', 'cyan', 'gray', 'blue', 'red', 'green', 'yellow'][:nb_objects]
+    ob_names = [ob_names, ob_names]
+    print("Loading precomputed json2im:", "data/%s" % name)
+    with open("data/%s" % name, 'rb') as f:
+        js2mask = pickle.load(f)
+
+    sg2im = {}
+    all_sg = []
+    for dm3 in js2mask:
+        k = hash_sg(js2mask[dm3][1], ob_names[0])
+        sg2im[k] = dm3.replace("json", "png").replace("scene", "image")
+
+    keys = list(js2mask.keys())
+    before_name = random.choice(keys)
+    after_name = random.choice(keys)
+    start = js2mask[before_name][0].to(device)
+    ob_names1 = js2mask[before_name][-1]
+    end = js2mask[after_name][0].to(device)
+    ob_names2 = js2mask[after_name][-1]
+
+    assert ob_names1 == ob_names2 == ob_names[0]
+
+    print("planning from %s to %s" % (before_name.split("/")[-1], after_name.split("/")[-1]))
+    input_images = torch.cat([start, end], dim=0).to(device)
+    with torch.no_grad():
+        sg_from, sg_to = model_.return_sg(input_images, ob_names)
+    print("start", sg_from)
+    print("end", sg_to)
+    tr, ac = plan(sg_from, sg_to, ob_names[0])
+    print(ac)
+
+    image_list = []
+    for t in tr:
+        image_list.append(sg2im[t])
+    visulize_plan(image_list)
 
 if __name__ == '__main__':
-    sg_from = [['brown', 'left', 'purple'], ['purple', 'left', 'cyan'], ['gray', 'up', 'red'],
-               ['red', 'up', 'brown'], ['blue', 'up', 'purple'], ['yellow', 'up', 'cyan']]
-    sg_to = [['brown', 'left', 'purple'], ['purple', 'left', 'cyan'], ['blue', 'up', 'gray'],
-             ['gray', 'up', 'yellow'], ['yellow', 'up', 'red'], ['red', 'up', 'brown']]
-    # print(action_model(sg_from, "12"))
-    tr, ac = plan(sg_from, sg_to)
-    print(ac)
-    for t in tr:
-        print([du for du in inv_hash_sg(t) if du[1] != "left"])
+    device = "cuda"
+    sae = LocationBasedGenerator()
+    sae.to(device)
+    sae.load_state_dict(torch.load("pre_models/model-20200718-122629", map_location=device))
+
+    randomly_choose_images(sae)
+
