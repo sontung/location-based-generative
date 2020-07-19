@@ -12,12 +12,14 @@ from data_loader import PBW_Planning_only
 from utils import show2
 
 class Node:
-    def __init__(self, sg, ob_names):
+    def __init__(self, sg, ob_names, if_goal=False):
         self.sg = sg
         self.key = hash_sg(sg, ob_names)
+
         self.visited = False
         self.parent = None
         self.act = None
+        self.goal = if_goal
 
     def get_key(self):
         return self.key
@@ -26,7 +28,13 @@ class Node:
         return self.sg
 
     def __eq__(self, other):
-        return self.__class__ == other.__class__ and self.key == other.key
+        if other.goal:
+            for i in range(len(self.key)):
+                if other.key[i] > 0 and other.key[i] != self.key[i]:
+                    return False
+            return True
+        else:
+            return self.__class__ == other.__class__ and self.key == other.key
 
 
 def find_top(up_rel, ob_start):
@@ -44,7 +52,7 @@ def find_top(up_rel, ob_start):
 
 
 def action_model(sg_from, action):
-    assert action in ["12", "13", "21", "23", "31", "33"]
+    assert action in ["12", "13", "21", "23", "31", "32"]
     base_objs = ['brown', 'purple', 'cyan']
     relations_from = sg_from[:]
     block_from = int(action[0])-1
@@ -63,12 +71,13 @@ def action_model(sg_from, action):
     # modify "to" block
     top_block_to, _ = find_top(up_rel, base_objs[block_to])
     relations_from.append([top_block_from, "up", top_block_to])
+    assert top_block_from != top_block_to
 
     return relations_from
 
 
 def possible_next_states(current_state):
-    predefined_actions = ["12", "13", "21", "23", "31", "33"]
+    predefined_actions = ["12", "13", "21", "23", "31", "32"]
     res = []
     for action in predefined_actions:
         next_state = action_model(current_state, action)
@@ -117,11 +126,11 @@ def inv_hash_sg(a_key, ob_names):
     return sg
 
 
-def plan(start_sg, end_sg, ob_names):
+def command_by_sg_sg(start_sg, end_sg, ob_names):
     # bfs
     Q = Queue()
     start_v = Node(start_sg, ob_names)
-    goal_state = Node(end_sg, ob_names)
+    goal_state = Node(end_sg, ob_names, if_goal=True)
     all_nodes = {start_v.get_key(): start_v, goal_state.get_key(): goal_state}
     start_v.visited = True
     Q.put(start_v)
@@ -129,6 +138,7 @@ def plan(start_sg, end_sg, ob_names):
         v = Q.get()
         if v == goal_state:
             print("search is completed")
+            goal_state = v
             break
         for w, act in possible_next_states(v.get_sg()):
             w_key = hash_sg(w, ob_names)
@@ -150,7 +160,7 @@ def plan(start_sg, end_sg, ob_names):
         goal_state = goal_state.parent
     return traces, actions
 
-def visulize_plan(im_list):
+def visualize_plan(im_list):
     im_tensors = []
     transform = torchvision.transforms.ToTensor()
     for im_name in im_list:
@@ -159,7 +169,7 @@ def visulize_plan(im_list):
     show2([im_tensors], "solution", 9)
 
 
-def randomly_choose_images(model_, device="cuda", name="blocks-5-3-2520-planning", domain_task="blocks-5-3",
+def command_by_im_im(model_, device="cuda", name="blocks-5-3-2520-planning", domain_task="blocks-5-3",
                            nb_objects=8):
     _ = PBW_Planning_only(root_dir="/home/sontung/thesis/photorealistic-blocksworld/%s" % domain_task, nb_samples=-1)
     ob_names = ['brown', 'purple', 'cyan', 'gray', 'blue', 'red', 'green', 'yellow'][:nb_objects]
@@ -169,7 +179,6 @@ def randomly_choose_images(model_, device="cuda", name="blocks-5-3-2520-planning
         js2mask = pickle.load(f)
 
     sg2im = {}
-    all_sg = []
     for dm3 in js2mask:
         k = hash_sg(js2mask[dm3][1], ob_names[0])
         sg2im[k] = dm3.replace("json", "png").replace("scene", "image")
@@ -190,13 +199,39 @@ def randomly_choose_images(model_, device="cuda", name="blocks-5-3-2520-planning
         sg_from, sg_to = model_.return_sg(input_images, ob_names)
     print("start", sg_from)
     print("end", sg_to)
-    tr, ac = plan(sg_from, sg_to, ob_names[0])
+    tr, ac = command_by_sg_sg(sg_from, sg_to, ob_names[0])
     print(ac)
 
     image_list = []
     for t in tr:
         image_list.append(sg2im[t])
-    visulize_plan(image_list)
+    visualize_plan(image_list)
+
+def command_by_sg_sg_partial(name="blocks-5-3-2520-planning"):
+    sg_from = [['red', 'up', 'yellow'], ['yellow', 'up', 'purple'], ['green', 'up', 'blue'],
+             ['blue', 'up', 'gray'], ['gray', 'up', 'cyan'], ['brown', 'left', 'purple'],
+             ['purple', 'left', 'cyan']]
+    sg_to = [['yellow', 'up', 'gray'], ['blue', 'up', 'red']]
+    ob_names = ['brown', 'purple', 'cyan', 'gray', 'blue', 'red', 'green', 'yellow']
+    tr, ac = command_by_sg_sg(sg_from, sg_to, ob_names)
+
+    with open("data/%s" % name, 'rb') as f:
+        js2mask = pickle.load(f)
+
+    sg2im = {}
+    for dm3 in js2mask:
+        k = hash_sg(js2mask[dm3][1], ob_names)
+        sg2im[k] = dm3.replace("json", "png").replace("scene", "image")
+
+    image_list = []
+    for t in tr:
+        try:
+            image_list.append(sg2im[t])
+        except KeyError:
+            print(inv_hash_sg(t, ob_names))
+    visualize_plan(image_list)
+    return
+
 
 if __name__ == '__main__':
     device = "cuda"
@@ -204,5 +239,5 @@ if __name__ == '__main__':
     sae.to(device)
     sae.load_state_dict(torch.load("pre_models/model-20200718-122629", map_location=device))
 
-    randomly_choose_images(sae)
+    command_by_sg_sg_partial()
 
