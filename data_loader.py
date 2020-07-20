@@ -219,7 +219,6 @@ class SimData(Dataset):
             self.js2data = {}
             for js in self.scene_jsons:
                 self.js2data[js] = read_seg_masks(js)
-                print(len(read_seg_masks(js)))
             with open("data/%s" % name, 'wb') as f:
                 pickle.dump(self.js2data, f, pickle.HIGHEST_PROTOCOL)
 
