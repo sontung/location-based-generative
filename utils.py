@@ -1,9 +1,13 @@
 import torch
+import webcolors
 import matplotlib.pyplot as plt
 import matplotlib
 matplotlib.use('Agg')
 import numpy as np
+import torchvision
 from torchvision.utils import make_grid
+from PIL import Image
+
 
 def compute_grad(model_):
     res = 0
@@ -69,6 +73,7 @@ def recon_sg(obj_names, locations, if_return_assigns=False):
 
     # decide left relation
     bottoms = sorted(bottoms, key=lambda x: x[2])
+    print(bottoms)
     relationships.append([bottoms[0][0], "left", bottoms[1][0]])
     relationships.append([bottoms[1][0], "left", bottoms[2][0]])
     if if_return_assigns:
@@ -99,3 +104,35 @@ def kmeans(data_):
                 c_list[c] = sum(stuff)/len(stuff)
     # print(sorted(c_list), sorted(init_c_list), data_)
     return assign
+
+def read_seg_masks(im_dir="/home/sontung/Downloads/5objs_seg/z.seg2153_s2_423_s0_0_s1_1.ppm"):
+    im_pil = Image.open(im_dir).convert('RGB')
+    transform = torchvision.transforms.ToTensor()
+    im_mat = transform(im_pil)
+    values = []
+    cl2name = {
+       (66, 0, 192): 'blue', 
+       (194, 0, 192): 'pink',
+       (194, 128, 64): 'brown', 
+       (66, 128, 64): 'green', 
+       (194, 0, 64): 'red'
+       }
+    name2cl = {v: k for k, v in cl2name.items()}
+    ob_names = ['blue', 'pink', 'brown', 'green', 'red']
+    name2mask = {dm3: torch.zeros(3, 128, 128) for dm3 in ob_names}
+    for i in range(im_mat.size(1)):
+        for j in range(im_mat.size(1)):
+            color = tuple([
+                int(im_mat[0, i, j].item()*255),
+                int(im_mat[1, i, j].item()*255),
+                int(im_mat[2, i, j].item()*255),
+                ])
+            if color in cl2name:
+                name2mask[cl2name[color]][:, i, j] = im_mat[:, i, j]
+    masks = torch.cat([name2mask[dm4].unsqueeze(0) for dm4 in ob_names], dim=0)
+    show2(masks, "masks_test", 5)
+    return masks, ob_names
+
+
+if __name__ == '__main__':
+    read_seg_masks()

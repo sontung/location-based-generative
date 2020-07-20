@@ -11,6 +11,7 @@ from models import LocationBasedGenerator
 from data_loader import PBW_Planning_only
 from utils import show2
 
+
 class Node:
     def __init__(self, sg, ob_names, if_goal=False):
         self.sg = sg
@@ -160,6 +161,7 @@ def command_by_sg_sg(start_sg, end_sg, ob_names):
         goal_state = goal_state.parent
     return traces, actions
 
+
 def visualize_plan(im_list):
     im_tensors = []
     transform = torchvision.transforms.ToTensor()
@@ -170,7 +172,7 @@ def visualize_plan(im_list):
 
 
 def command_by_im_im(model_, device="cuda", name="blocks-5-3-2520-planning", domain_task="blocks-5-3",
-                           nb_objects=8):
+                     nb_objects=8):
     _ = PBW_Planning_only(root_dir="/home/sontung/thesis/photorealistic-blocksworld/%s" % domain_task, nb_samples=-1)
     ob_names = ['brown', 'purple', 'cyan', 'gray', 'blue', 'red', 'green', 'yellow'][:nb_objects]
     ob_names = [ob_names, ob_names]
@@ -207,10 +209,11 @@ def command_by_im_im(model_, device="cuda", name="blocks-5-3-2520-planning", dom
         image_list.append(sg2im[t])
     visualize_plan(image_list)
 
+
 def command_by_sg_sg_partial(name="blocks-5-3-2520-planning"):
     sg_from = [['red', 'up', 'yellow'], ['yellow', 'up', 'purple'], ['green', 'up', 'blue'],
-             ['blue', 'up', 'gray'], ['gray', 'up', 'cyan'], ['brown', 'left', 'purple'],
-             ['purple', 'left', 'cyan']]
+               ['blue', 'up', 'gray'], ['gray', 'up', 'cyan'], ['brown', 'left', 'purple'],
+               ['purple', 'left', 'cyan']]
     sg_to = [['yellow', 'up', 'gray'], ['blue', 'up', 'red']]
     ob_names = ['brown', 'purple', 'cyan', 'gray', 'blue', 'red', 'green', 'yellow']
     tr, ac = command_by_sg_sg(sg_from, sg_to, ob_names)

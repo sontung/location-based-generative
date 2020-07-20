@@ -137,10 +137,15 @@ class LocationBasedGenerator(nn.Module):
         return x_pred
 
     def return_sg(self, x, ob_names):
+        """
+        x: masks, (bs, nb masks, 3, 128, 128)
+        ob_names: name for each mask
+        """
         nb_objects = x.size(1)
         batch_size = x.size(0)
         x = x.view(-1, 3, 128, 128)
-        theta = self.find_theta(x).view(batch_size, nb_objects, 6)
+        with torch.no_grad():
+            theta = self.find_theta(x).view(batch_size, nb_objects, 6)
         trans_vec = theta[:, :, [2, 5]]
         trans_vec[:, :, 0] *= -1
         res = []
