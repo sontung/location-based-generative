@@ -96,7 +96,7 @@ def train():
         print(epc, acc / len(val_data2))
 
 
-    torch.save(model.state_dict(), "model-%s" % now.strftime("%Y%m%d-%H%M%S"))
+    torch.save(model.state_dict(), "pre_models/model-%s" % now.strftime("%Y%m%d-%H%M%S"))
 
 
 

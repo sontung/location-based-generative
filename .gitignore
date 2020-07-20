@@ -7,6 +7,7 @@ data/
 figures/
 logs/
 pre_models/
+models/
 
 # C extensions
 *.so
