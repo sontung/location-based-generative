@@ -17,6 +17,7 @@ sae = LocationBasedGenerator()
 sae.to(device)
 sae.load_state_dict(torch.load("pre_models/model-20200718-122629", map_location=device))
 
-masks, names = read_seg_masks()
+masks, names, sg_true = read_seg_masks()
 sg = sae.return_sg(masks.unsqueeze(0), [names])
 print(sg)
+print(sg_true)

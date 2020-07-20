@@ -7,6 +7,7 @@ import time
 import random
 import math
 import sys
+from utils import read_seg_masks
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 
@@ -196,168 +197,45 @@ class PBW_Planning_only(Dataset):
     def __getitem__(self, item):
         return self.data[self.keys[item]]
 
-
-class PBW_AmbMasked(Dataset):
-    def __init__(self, root_dir="/home/sontung/thesis/photorealistic-blocksworld/blocks-6-3",
-                 train=True, train_size=0.7):
-        super(PBW_AmbMasked, self).__init__()
+class SimData(Dataset):
+    def __init__(self, root_dir="/home/sontung/Downloads/5objs_seg", nb_samples=10,
+                 train=True, train_size=0.6):
+        print("Loading from", root_dir)
+        super(SimData, self).__init__()
         self.root_dir = root_dir
         self.train = train
+        identifier = root_dir.split("/")[-1]
 
-        json_dir = "%s/scene" % root_dir
-        self.scene_jsons = [join(json_dir, f) for f in listdir(json_dir) if isfile(join(json_dir, f))]
+        self.scene_jsons = [join(root_dir, f) for f in listdir(root_dir) if isfile(join(root_dir, f))]
+        if nb_samples > 0:
+            self.scene_jsons = self.scene_jsons[:nb_samples]
 
-        print(self.scene_jsons)
-
-        self.image_dir = "%s/image" % root_dir
-        self.transform = torchvision.transforms.ToTensor()
-        self.transform_to_pil = torchvision.transforms.ToPILImage()
-        self.json2sg = {}
-        for js in self.scene_jsons:
-            self.json2sg[js] = read_scene_json(js, return_top_objects=True)
-
-        self.json2im = self.load_json2im()
-
-        keys = list(self.json2im.keys())
-        if train:
-            self.data = {du3: self.json2im[du3] for du3 in keys[:int(len(keys)*train_size)]}
-        else:
-            self.data = {du3: self.json2im[du3] for du3 in keys[int(len(keys)*train_size):]}
-        self.keys = list(self.data.keys())
-        print("loaded", len(self.scene_jsons))
-
-    def load_json2im(self, nb_samples=1000):
-        name = "%s-%d-%d" % (self.root_dir.split("/")[-1], int(self.train), nb_samples)
+        name = "json2sg-%s-%d" % (identifier, nb_samples)
         if isfile("data/%s" % name):
-            print("Loading precomputed")
+            print("Loading precomputed json2sg:", "data/%s" % name)
             with open("data/%s" % name, 'rb') as f:
-                return pickle.load(f)
+                self.js2data = pickle.load(f)
         else:
-            res_dict = {}
-            for item in range(len(self.scene_jsons))[:nb_samples]:
-                bboxes, coords, obj_names, img_name, mask_values, top_objects = self.json2sg[self.scene_jsons[item]]
-
-                img_pil = Image.open("%s/%s" % (self.image_dir, img_name)).convert('RGB')
-                img = self.transform(img_pil).unsqueeze(0)
-
-                mask_im = torch.zeros_like(img)[0, :, :]
-                for dm1, bbox in enumerate(bboxes):
-
-                    for x_ in range(mask_im.size(2)):
-                        for y_ in range(mask_im.size(2)):
-                            if bbox[0] <= x_ <= bbox[2] and bbox[1] <= y_ <= bbox[3]:
-                                mask_im[:, :, y_, x_] = mask_values[dm1]
-
-                targets = torch.zeros(1, len(obj_names))
-                targets[:, top_objects] = 1
-                targets = targets.squeeze()
-
-                try:
-                    assert check(recon_sg2(self.scene_jsons[item]), recon_sg(obj_names, coords))
-                except AssertionError:
-                    for du in range(10):
-                        print("%dnd try"%du)
-                        recon_sg(obj_names, coords)
-                    sys.exit()
-                res_dict[self.scene_jsons[item]] = (mask_im, targets, img)
+            self.js2data = {}
+            for js in self.scene_jsons:
+                self.js2data[js] = read_seg_masks(js)
+                print(len(read_seg_masks(js)))
             with open("data/%s" % name, 'wb') as f:
-                pickle.dump(res_dict, f, pickle.HIGHEST_PROTOCOL)
-            return res_dict
+                pickle.dump(self.js2data, f, pickle.HIGHEST_PROTOCOL)
+
+        keys = list(self.js2data.keys())
+        if train:
+            self.data = {du3: self.js2data[du3] for du3 in keys[:int(len(keys)*train_size)]}
+        else:
+            self.data = {du3: self.js2data[du3] for du3 in keys[int(len(keys)*train_size):]}
+        self.keys = list(self.data.keys())
+        print("loaded", len(self.js2data))
 
     def __len__(self):
         return len(self.keys)
 
     def __getitem__(self, item):
         return self.data[self.keys[item]]
-
-class PBWtransition(Dataset):
-    def __init__(self, transition_dir="/home/sontung/thesis/photorealistic-blocksworld/blocks-6-3/image_tr",
-                 train=True, nb_samples=-1, name2im=None, train_size=0.6):
-        print("loading data from", transition_dir)
-        onlyfiles = sorted([f for f in listdir(transition_dir) if isfile(join(transition_dir, f))])
-        self.img_dir = transition_dir.replace("image_tr", "image")
-        transition_js_dir = transition_dir.replace("image_tr", "scene_tr")
-        self.json_dir = transition_dir.replace("image_tr", "scene")
-
-        self.default_transform = torchvision.transforms.Compose([
-            torchvision.transforms.ToTensor()
-        ])
-
-        transitions = {}
-        self.action_list = {'01': 0, '02': 1, '10': 2, '12': 3, '20': 4, '21': 5}
-        im_names = []
-        for i in range(0, len(onlyfiles), 2)[:100]:
-            first = onlyfiles[i]
-            second = onlyfiles[i+1]
-            first_js = "_".join(first.split("_")[:-1])+".json"
-            second_js = "_".join(second.split("_")[:-1])+".json"
-
-            im1 = read_scene_json2(join(transition_js_dir, first_js))
-            im2 = read_scene_json2(join(transition_js_dir, second_js))
-            a1 = first.split("_")[-1].split(".png")[0]
-            a2 = second.split("_")[-1].split(".png")[0]
-            assert a1 == a2
-            action = a1
-
-            if im1 not in im_names:
-                im_names.append(im1)
-            if im2 not in im_names:
-                im_names.append(im2)
-            if im1 not in transitions:
-                transitions[im1] = [(action, im2)]
-            else:
-                transitions[im1].append((action, im2))
-
-        train_portion = int(len(transitions)*train_size)
-        if train:
-            self.transitions = {du1: transitions[du1] for du1 in list(transitions.keys())[:train_portion]}
-        else:
-            self.transitions = {du1: transitions[du1] for du1 in list(transitions.keys())[train_portion:]}
-
-        self.valid_transitions = []
-        self.invalid_actions = []
-        for start in self.transitions:
-            self.valid_transitions.extend([(start, act, end) for act, end in self.transitions[start]])
-            a_valid = [0]*6
-            for act, _ in self.transitions[start]:
-                a_valid[self.action_list[act]] = 1
-            self.invalid_actions.append((start, a_valid))
-
-        print("Loaded %d transitions" % len(self.valid_transitions))
-        if name2im is None:
-            self.name2im = {}
-            for name in im_names:
-                if name not in self.name2im:
-                    self.name2im[name] = self.load_im_mask(name)
-            print("Loaded %d images" % len(self.name2im))
-        return
-
-    def load_im_mask(self, name):
-        bboxes, coords, obj_names, img_name = read_scene_json("%s/%s" % (self.json_dir, name.replace(".png", ".json")))
-
-        img_pil = Image.open("%s/%s" % (self.img_dir, img_name)).convert('RGB')
-        img = self.default_transform(img_pil).unsqueeze(0)
-        all_inp = []
-        for bbox in bboxes:
-            mask_im = torch.zeros_like(img)
-            for x_ in range(mask_im.size(2)):
-                for y_ in range(mask_im.size(2)):
-                    if bbox[0] <= x_ <= bbox[2] and bbox[1] <= y_ <= bbox[3]:
-                        mask_im[:, :, y_, x_] = img[:, :, y_, x_]
-            all_inp.append(mask_im)
-
-        all_inp = torch.cat(all_inp, dim=0)
-        return all_inp
-
-    def __len__(self):
-        return len(self.valid_transitions)
-
-    def __getitem__(self, idx):
-        start, act, end = self.valid_transitions[idx]
-        assert start != end
-        act_onehot = torch.zeros(6)
-        act_onehot[self.action_list[act]] = 1
-        return self.name2im[start], act_onehot, self.name2im[end]
 
 def construct_weight_map(bbox):
     weight_map = torch.ones(128, 128)
@@ -481,6 +359,23 @@ def check(d1, d2):
             print(d1[i], d2[i], i)
             return False
     return True
+
+def sim_collate_fn(batch):
+    all_imgs, all_imgs2, weights = [], [], []
+    sgs = []
+    names = []
+    for masks, def_mat, def_wei, ob_names, sg in batch:
+        all_imgs.append(masks.unsqueeze(0))
+        all_imgs2.append(def_mat.unsqueeze(0))
+        weights.append(def_wei.unsqueeze(0))
+        sgs.append(sg)
+        names.append(ob_names)
+
+    all_imgs = torch.cat(all_imgs)
+    all_imgs2 = torch.cat(all_imgs2)
+    weights = torch.cat(weights)
+
+    return all_imgs, all_imgs2, weights, sgs, names
 
 def pbw_collate_fn(batch):
     all_imgs, all_targets, all_imgs2, weights = [], [], [], []
@@ -659,4 +554,4 @@ def kmeans(data_):
 
 
 if __name__ == '__main__':
-    print(construct_weight_map([20, 30, 40, 50]))
+    d = SimData()

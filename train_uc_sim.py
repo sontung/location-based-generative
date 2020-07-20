@@ -1,5 +1,5 @@
 from torch.utils.data import Dataset, DataLoader
-from data_loader import collate_fn_trans, PBW, pbw_collate_fn
+from data_loader import collate_fn_trans, SimData, sim_collate_fn
 from torchvision.utils import make_grid
 from models import RearrangeNetwork, LocationBasedGenerator
 from utils import compute_grad, show2
@@ -13,7 +13,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 PARSER = argparse.ArgumentParser()
 PARSER.add_argument("--dir", help="train directory",
-                    default="/scratch/mlr/nguyensg/pbw/blocks-6-3", type=str)
+                    default="/home/sontung/Downloads/5objs_seg", type=str)
 PARSER.add_argument("--eval_dir", help="2nd domain evaluation directory",
                     default="/scratch/mlr/nguyensg/pbw/blocks-5-3", type=str)
 PARSER.add_argument("--nb_samples", help="how many samples", default=1000, type=int)
@@ -31,8 +31,8 @@ def eval(model_, iter_, name_="1", device_="cuda"):
     vis = False
     correct = 0
     for idx, train_batch in enumerate(iter_):
-        start, coord_true, default, weight_maps = [tensor.to(device_) for tensor in train_batch[:4]]
-        graphs, ob_names = train_batch[4:]
+        start, default, weight_maps = [tensor.to(device_) for tensor in train_batch[:3]]
+        graphs, ob_names = train_batch[3:]
         with torch.no_grad():
             loss, start_pred = model_(start, default, weight_maps)
             pred_sg = model_.return_sg(start, ob_names)
@@ -53,17 +53,17 @@ def eval(model_, iter_, name_="1", device_="cuda"):
 
 def train():
     now = datetime.datetime.now()
-    writer = SummaryWriter("logs/" + now.strftime("%Y%m%d-%H%M%S") + "/")
+    writer = SummaryWriter("logs/sim" + now.strftime("%Y%m%d-%H%M%S") + "/")
 
     nb_epochs = 20
     device = DEVICE
 
-    train_data = PBW(root_dir=ROOT_DIR, nb_samples=NB_SAMPLES)
-    train_iterator = DataLoader(train_data, batch_size=8, shuffle=True, collate_fn=pbw_collate_fn)
-    val_data = PBW(train=False, root_dir=ROOT_DIR, nb_samples=NB_SAMPLES, json2im=train_data.json2im)
-    val_iterator = DataLoader(val_data, batch_size=16, shuffle=False, collate_fn=pbw_collate_fn)
-    val_data2 = PBW(train=False, root_dir=EVAL_DIR, train_size=0.0, nb_samples=NB_SAMPLES)
-    val_iterator2 = DataLoader(val_data2, batch_size=16, shuffle=False, collate_fn=pbw_collate_fn)
+    train_data = SimData(root_dir=ROOT_DIR)
+    train_iterator = DataLoader(train_data, batch_size=8, shuffle=True, collate_fn=sim_collate_fn)
+    val_data = SimData(train=False, root_dir=ROOT_DIR)
+    val_iterator = DataLoader(val_data, batch_size=16, shuffle=False, collate_fn=sim_collate_fn)
+    # val_data2 = SimData(train=False, root_dir=EVAL_DIR, train_size=0.0, nb_samples=NB_SAMPLES)
+    # val_iterator2 = DataLoader(val_data2, batch_size=16, shuffle=False, collate_fn=sim_collate_fn)
     model = LocationBasedGenerator()
     model.to(device)
 
@@ -75,8 +75,7 @@ def train():
         total_loss = 0
         for idx, train_batch in enumerate(train_iterator):
             optimizer.zero_grad()
-            start, coord_true, default, weight_maps = [tensor.to(device) for tensor in train_batch[:4]]
-
+            start, default, weight_maps = [tensor.to(device) for tensor in train_batch[:3]]
             loss, start_pred = model(start, default, weight_maps)
             loss.backward()
 
@@ -90,14 +89,12 @@ def train():
         writer.add_scalar('val/loss', loss/len(val_data), epc)
         writer.add_scalar('val/acc', acc/len(val_data), epc)
         print(epc, acc/len(val_data))
-        loss, acc = eval(model, val_iterator2, name_="-d-"+str(epc), device_=device)
-        writer.add_scalar('val2/loss', loss / len(val_data2), epc)
-        writer.add_scalar('val2/acc', acc / len(val_data2), epc)
-        print(epc, acc / len(val_data2))
+        # loss, acc = eval(model, val_iterator2, name_="-d-"+str(epc), device_=device)
+        # writer.add_scalar('val2/loss', loss / len(val_data2), epc)
+        # writer.add_scalar('val2/acc', acc / len(val_data2), epc)
+        # print(epc, acc / len(val_data2))
 
-
-    torch.save(model.state_dict(), "model-%s" % now.strftime("%Y%m%d-%H%M%S"))
-
+    torch.save(model.state_dict(), "model-sim-%s" % now.strftime("%Y%m%d-%H%M%S"))
 
 
 if __name__ == '__main__':

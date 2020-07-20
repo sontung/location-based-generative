@@ -73,9 +73,11 @@ def recon_sg(obj_names, locations, if_return_assigns=False):
 
     # decide left relation
     bottoms = sorted(bottoms, key=lambda x: x[2])
-    print(bottoms)
-    relationships.append([bottoms[0][0], "left", bottoms[1][0]])
-    relationships.append([bottoms[1][0], "left", bottoms[2][0]])
+
+    if len(bottoms) > 1:
+        relationships.append([bottoms[0][0], "left", bottoms[1][0]])
+    if len(bottoms) > 2:
+        relationships.append([bottoms[1][0], "left", bottoms[2][0]])
     if if_return_assigns:
         return relationships, k_means_assign
     return relationships
@@ -105,11 +107,56 @@ def kmeans(data_):
     # print(sorted(c_list), sorted(init_c_list), data_)
     return assign
 
+def name2sg(name):
+    name = name.replace(".ppm", "")
+    numb2color = {
+        0: "red",
+        1: "green",
+        2: "brown",
+        3: "blue",
+        4: "pink"
+    }
+    infor = name.split("_")[1:]
+    bottoms = [0, 0, 0]
+    relationships = []
+
+    for dm in range(len(infor)):
+        if "s" in infor[dm]:
+            stack = infor[dm+1]
+            if len(stack) == 0:
+                continue
+            bottoms[int(infor[dm][1])] = numb2color[int(stack[0])]
+            for dm2 in range(len(stack)-1):
+                o1 = stack[dm2]
+                o2 = stack[dm2+1]
+                relationships.append([numb2color[int(o1)], "up", numb2color[int(o2)]])
+    if bottoms[2] != 0 and bottoms[1] != 0:
+        relationships.append([bottoms[1], "left", bottoms[2]])
+    if bottoms[0] != 0 and bottoms[1] != 0:
+        relationships.append([bottoms[0], "left", bottoms[1]])
+    return relationships
+
+def return_default_mat(im_tensor):
+    from data_loader import construct_weight_map
+
+    im_np = im_tensor.numpy()[0, :, :]
+    a = np.where(im_np != 0)
+    bbox_int = np.min(a[1]), np.min(a[0]), np.max(a[1]), np.max(a[0])
+    default_inp = torch.zeros_like(im_tensor)
+    idc1 = range(bbox_int[0], bbox_int[2] + 1)
+    idc2 = range(len(idc1))
+    for j_, y_ in enumerate(range(bbox_int[1], bbox_int[3] + 1)):
+        default_inp[:, j_ + 128 - int(-bbox_int[1] + bbox_int[3] + 1), idc2] = im_tensor[:, y_, idc1]
+
+    weight = construct_weight_map(bbox_int)
+
+    return default_inp, weight
+
 def read_seg_masks(im_dir="/home/sontung/Downloads/5objs_seg/z.seg2153_s2_423_s0_0_s1_1.ppm"):
+
     im_pil = Image.open(im_dir).convert('RGB')
     transform = torchvision.transforms.ToTensor()
     im_mat = transform(im_pil)
-    values = []
     cl2name = {
        (66, 0, 192): 'blue', 
        (194, 0, 192): 'pink',
@@ -117,7 +164,6 @@ def read_seg_masks(im_dir="/home/sontung/Downloads/5objs_seg/z.seg2153_s2_423_s0
        (66, 128, 64): 'green', 
        (194, 0, 64): 'red'
        }
-    name2cl = {v: k for k, v in cl2name.items()}
     ob_names = ['blue', 'pink', 'brown', 'green', 'red']
     name2mask = {dm3: torch.zeros(3, 128, 128) for dm3 in ob_names}
     for i in range(im_mat.size(1)):
@@ -130,8 +176,12 @@ def read_seg_masks(im_dir="/home/sontung/Downloads/5objs_seg/z.seg2153_s2_423_s0
             if color in cl2name:
                 name2mask[cl2name[color]][:, i, j] = im_mat[:, i, j]
     masks = torch.cat([name2mask[dm4].unsqueeze(0) for dm4 in ob_names], dim=0)
-    show2(masks, "masks_test", 5)
-    return masks, ob_names
+    def_wei = [return_default_mat(name2mask[dm4]) for dm4 in ob_names]
+    def_mat = torch.cat([dm4[0].unsqueeze(0) for dm4 in def_wei], dim=0)
+    wei_mat = torch.cat([dm4[1].unsqueeze(0) for dm4 in def_wei], dim=0)
+    show2([masks, def_mat, wei_mat], "masks_test", 5)
+
+    return masks, def_mat, wei_mat, ob_names, name2sg(im_dir.split("/")[-1])
 
 
 if __name__ == '__main__':

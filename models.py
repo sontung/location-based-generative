@@ -177,21 +177,6 @@ class LocationBasedGenerator(nn.Module):
         return pos_loss+neg_loss+scene_loss, pred
 
 
-class Transformer(nn.Module):
-    def __init__(self, scalew=1, scaleh=1, transX=0., transY=0.):
-        super().__init__()
-
-        self.theta = nn.Parameter(torch.tensor([
-            [1.0, 0.0, 0.0],
-            [0.0, 1.0, 0.0]
-        ])[None], requires_grad=True)
-
-    def forward(self, x):
-        grid = F.affine_grid(self.theta, x.size(), align_corners=False)
-        x_pred = F.grid_sample(x, grid, align_corners=False)
-        return F.mse_loss(x_pred, x), x_pred
-
-
 class FindTopNetwork(nn.Module):
     def __init__(self, nb_channels=1):
         super(FindTopNetwork, self).__init__()
