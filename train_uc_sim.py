@@ -58,9 +58,9 @@ def train():
     nb_epochs = 20
     device = DEVICE
 
-    train_data = SimData(root_dir=ROOT_DIR)
+    train_data = SimData(root_dir=ROOT_DIR, nb_samples=NB_SAMPLE)
     train_iterator = DataLoader(train_data, batch_size=8, shuffle=True, collate_fn=sim_collate_fn)
-    val_data = SimData(train=False, root_dir=ROOT_DIR)
+    val_data = SimData(train=False, root_dir=ROOT_DIR, nb_samples=NB_SAMPLE)
     val_iterator = DataLoader(val_data, batch_size=16, shuffle=False, collate_fn=sim_collate_fn)
     # val_data2 = SimData(train=False, root_dir=EVAL_DIR, train_size=0.0, nb_samples=NB_SAMPLES)
     # val_iterator2 = DataLoader(val_data2, batch_size=16, shuffle=False, collate_fn=sim_collate_fn)

@@ -1,5 +1,4 @@
 import torch
-import webcolors
 import matplotlib.pyplot as plt
 import matplotlib
 matplotlib.use('Agg')
