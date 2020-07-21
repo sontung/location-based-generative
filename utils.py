@@ -161,10 +161,13 @@ def read_seg_masks(im_dir="/home/sontung/Downloads/5objs_seg/z.seg2153_s2_423_s0
        (194, 0, 192): 'pink',
        (194, 128, 64): 'brown', 
        (66, 128, 64): 'green', 
-       (194, 0, 64): 'red'
+       (194, 0, 64): 'red',
+       (64, 128, 194): 'navy'
        }
-    ob_names = ['blue', 'pink', 'brown', 'green', 'red']
+    ob_names = ['blue', 'pink', 'brown', 'green', 'red', 'navy']
     name2mask = {dm3: torch.zeros(3, 128, 128) for dm3 in ob_names}
+
+    existing_colors = []
     for i in range(im_mat.size(1)):
         for j in range(im_mat.size(1)):
             color = tuple([
@@ -172,13 +175,20 @@ def read_seg_masks(im_dir="/home/sontung/Downloads/5objs_seg/z.seg2153_s2_423_s0
                 int(im_mat[1, i, j].item()*255),
                 int(im_mat[2, i, j].item()*255),
                 ])
-            if color in cl2name:
-                name2mask[cl2name[color]][:, i, j] = im_mat[:, i, j]
+            if cl2name[color] not in existing_colors:
+                existing_colors.append(cl2name[color])
+            name2mask[cl2name[color]][:, i, j] = im_mat[:, i, j]
+    for dm55 in ob_names:
+        if dm55 not in existing_colors:
+            assert dm55 == "navy"
+            ob_names.remove(dm55)
+            del name2mask["navy"]
+
     masks = torch.cat([name2mask[dm4].unsqueeze(0) for dm4 in ob_names], dim=0)
     def_wei = [return_default_mat(name2mask[dm4]) for dm4 in ob_names]
     def_mat = torch.cat([dm4[0].unsqueeze(0) for dm4 in def_wei], dim=0)
     wei_mat = torch.cat([dm4[1].unsqueeze(0) for dm4 in def_wei], dim=0)
-    show2([masks, def_mat, wei_mat], "masks_test", 5)
+    # show2([masks, def_mat, wei_mat], "masks_test", 5)
 
     return masks, def_mat, wei_mat, ob_names, name2sg(im_dir.split("/")[-1])
 

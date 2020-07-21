@@ -9,6 +9,8 @@ logs/
 pre_models/
 models/
 
+*.png
+
 # C extensions
 *.so
 

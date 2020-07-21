@@ -15,9 +15,9 @@ from utils import show2, read_seg_masks
 device = "cpu"
 sae = LocationBasedGenerator()
 sae.to(device)
-sae.load_state_dict(torch.load("pre_models/model-20200718-122629", map_location=device))
+sae.load_state_dict(torch.load("pre_models/model-sim-20200721-074631", map_location=device))
 
-masks, names, sg_true = read_seg_masks()
-sg = sae.return_sg(masks.unsqueeze(0), [names])
+masks, def_mat, wei_mat, ob_names, sg_true = read_seg_masks()
+sg = sae.return_sg(masks.unsqueeze(0), [ob_names])
 print(sg)
 print(sg_true)
