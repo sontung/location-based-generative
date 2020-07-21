@@ -55,7 +55,7 @@ def train():
     now = datetime.datetime.now()
     writer = SummaryWriter("logs/sim" + now.strftime("%Y%m%d-%H%M%S") + "/")
 
-    nb_epochs = 20
+    nb_epochs = 50
     device = DEVICE
 
     train_data = SimData(root_dir=ROOT_DIR, nb_samples=NB_SAMPLES)

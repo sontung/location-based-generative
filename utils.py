@@ -175,6 +175,8 @@ def read_seg_masks(im_dir="/home/sontung/Downloads/5objs_seg/z.seg2153_s2_423_s0
                 int(im_mat[1, i, j].item()*255),
                 int(im_mat[2, i, j].item()*255),
                 ])
+            if torch.sum(im_mat[:, i, j]).item() == 0:
+                continue
             if cl2name[color] not in existing_colors:
                 existing_colors.append(cl2name[color])
             name2mask[cl2name[color]][:, i, j] = im_mat[:, i, j]
