@@ -16,8 +16,8 @@ PARSER.add_argument("--dir", help="train directory",
                     default="/home/sontung/Downloads/5objs_seg", type=str)
 PARSER.add_argument("--eval_dir", help="2nd domain evaluation directory",
                     default="/scratch/mlr/nguyensg/pbw/blocks-5-3", type=str)
-PARSER.add_argument("--nb_samples", help="how many samples", default=1000, type=int)
-PARSER.add_argument("--epc", help="how many epochs", default=10, type=int)
+PARSER.add_argument("--nb_samples", help="how many samples", default=10, type=int)
+PARSER.add_argument("--epc", help="how many epochs", default=1, type=int)
 
 PARSER.add_argument("--device", help="gpu device", default=0, type=int)
 
@@ -27,7 +27,9 @@ NB_EPOCHS = MY_ARGS.epc
 NB_SAMPLES = MY_ARGS.nb_samples
 ROOT_DIR = MY_ARGS.dir
 EVAL_DIR = MY_ARGS.eval_dir
-DEVICE = "cuda:%d" % MY_ARGS.device
+
+DEVICE = "cpu"
+# DEVICE = "cuda:%d" % MY_ARGS.device
 
 def eval(model_, iter_, name_="1", device_="cuda", debugging=False):
     total_loss = 0
@@ -73,13 +75,14 @@ def eval(model_, iter_, name_="1", device_="cuda", debugging=False):
                 if res == 0:
                     count_ += 1
                     print(count_, sorted(graphs[i]), sorted(pred_sg[i]), "\n")
-
                     show2([
                         torch.sum(start[i], dim=0).unsqueeze(0).cpu(),
                         torch.sum(start_pred[i], dim=0).unsqueeze(0).cpu(),
-                        start[i].detach().cpu() + start_pred[i].cpu(),
-                        default.cpu(),
-                        weight_maps.cpu()
+                        start[i].cpu(),
+                        start_pred[i].cpu(),
+                        start[i].cpu() + start_pred[i].cpu(),
+                        default[i].cpu(),
+                        weight_maps[i].cpu()
                     ], "figures/debug-%d.png" % count_, 4)
     return total_loss, correct
 
