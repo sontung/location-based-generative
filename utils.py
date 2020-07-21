@@ -152,7 +152,6 @@ def return_default_mat(im_tensor):
     return default_inp, weight
 
 def read_seg_masks(im_dir="/home/sontung/Downloads/5objs_seg/z.seg2153_s2_423_s0_0_s1_1.ppm"):
-
     im_pil = Image.open(im_dir).convert('RGB')
     transform = torchvision.transforms.ToTensor()
     im_mat = transform(im_pil)
@@ -167,25 +166,24 @@ def read_seg_masks(im_dir="/home/sontung/Downloads/5objs_seg/z.seg2153_s2_423_s0
     ob_names = ['blue', 'pink', 'brown', 'green', 'red', 'navy']
     name2mask = {dm3: torch.zeros(3, 128, 128) for dm3 in ob_names}
 
-    existing_colors = []
+    navy_existed = False
     for i in range(im_mat.size(1)):
         for j in range(im_mat.size(1)):
+            if im_mat[0, i, j].item() == 0:
+                continue
             color = tuple([
                 int(im_mat[0, i, j].item()*255),
                 int(im_mat[1, i, j].item()*255),
                 int(im_mat[2, i, j].item()*255),
                 ])
-            if torch.sum(im_mat[:, i, j]).item() == 0:
-                continue
-            if cl2name[color] not in existing_colors:
-                existing_colors.append(cl2name[color])
+            if not navy_existed:
+                if cl2name[color] == "navy":
+                    navy_existed = True
             name2mask[cl2name[color]][:, i, j] = im_mat[:, i, j]
-    for dm55 in ob_names:
-        if dm55 not in existing_colors:
-            assert dm55 == "navy"
-            ob_names.remove(dm55)
-            del name2mask["navy"]
 
+    if not navy_existed:
+        ob_names.remove("navy")
+        del name2mask["navy"]
     masks = torch.cat([name2mask[dm4].unsqueeze(0) for dm4 in ob_names], dim=0)
     def_wei = [return_default_mat(name2mask[dm4]) for dm4 in ob_names]
     def_mat = torch.cat([dm4[0].unsqueeze(0) for dm4 in def_wei], dim=0)
@@ -196,4 +194,10 @@ def read_seg_masks(im_dir="/home/sontung/Downloads/5objs_seg/z.seg2153_s2_423_s0
 
 
 if __name__ == '__main__':
-    read_seg_masks()
+    import time
+
+    for _ in range(1000):
+        start = time.time()
+        read_seg_masks()
+        end = time.time()
+        print(end-start)
