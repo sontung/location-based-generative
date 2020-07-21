@@ -17,10 +17,13 @@ PARSER.add_argument("--dir", help="train directory",
 PARSER.add_argument("--eval_dir", help="2nd domain evaluation directory",
                     default="/scratch/mlr/nguyensg/pbw/blocks-5-3", type=str)
 PARSER.add_argument("--nb_samples", help="how many samples", default=1000, type=int)
+PARSER.add_argument("--epc", help="how many epochs", default=10, type=int)
+
 PARSER.add_argument("--device", help="gpu device", default=0, type=int)
 
 MY_ARGS = PARSER.parse_args()
 
+NB_EPOCHS = MY_ARGS.epc
 NB_SAMPLES = MY_ARGS.nb_samples
 ROOT_DIR = MY_ARGS.dir
 EVAL_DIR = MY_ARGS.eval_dir
@@ -56,6 +59,7 @@ def eval(model_, iter_, name_="1", device_="cuda", debugging=False):
         diff = []
         defaults = []
         weights = []
+        count_ = 0
         for idx, train_batch in enumerate(iter_):
             start, default, weight_maps = [tensor.to(device_) for tensor in train_batch[:3]]
             graphs, ob_names = train_batch[3:]
@@ -67,24 +71,23 @@ def eval(model_, iter_, name_="1", device_="cuda", debugging=False):
                 res = sorted(graphs[i]) == sorted(pred_sg[i])
                 correct += res
                 if res == 0:
-                    print(sorted(graphs[i]), "\n", sorted(pred_sg[i]), "\n")
-                    scene_true.append(torch.sum(start[i], dim=0).unsqueeze(0))
-                    scene_pred.append(torch.sum(start_pred[i], dim=0).unsqueeze(0))
+                    count_ += 1
+                    print(count_, sorted(graphs[i]), sorted(pred_sg[i]), "\n")
 
-        scene_true = torch.cat(scene_true, dim=0)
-        scene_pred = torch.cat(scene_pred, dim=0)
-
-        show2([
-            scene_true[:16].cpu(),
-            scene_pred[:16].detach().cpu()
-        ], "figures/debug.png", 4)
+                    show2([
+                        torch.sum(start[i], dim=0).unsqueeze(0).cpu(),
+                        torch.sum(start_pred[i], dim=0).unsqueeze(0).cpu(),
+                        start[i].detach().cpu() + start_pred[i].cpu(),
+                        default.cpu(),
+                        weight_maps.cpu()
+                    ], "figures/debug-%d.png" % count_, 4)
     return total_loss, correct
 
 def train():
     now = datetime.datetime.now()
     writer = SummaryWriter("logs/sim" + now.strftime("%Y%m%d-%H%M%S") + "/")
 
-    nb_epochs = 10
+    nb_epochs = NB_EPOCHS
     device = DEVICE
 
     train_data = SimData(root_dir=ROOT_DIR, nb_samples=NB_SAMPLES)
