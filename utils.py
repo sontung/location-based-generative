@@ -128,7 +128,7 @@ def name2sg(name):
             for dm2 in range(len(stack)-1):
                 o1 = stack[dm2]
                 o2 = stack[dm2+1]
-                relationships.append([numb2color[int(o1)], "up", numb2color[int(o2)]])
+                relationships.append([numb2color[int(o2)], "up", numb2color[int(o1)]])
     if bottoms[2] != 0 and bottoms[1] != 0:
         relationships.append([bottoms[1], "left", bottoms[2]])
     if bottoms[0] != 0 and bottoms[1] != 0:
