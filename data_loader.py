@@ -229,7 +229,7 @@ class SimData(Dataset):
         else:
             self.data = {du3: self.js2data[du3] for du3 in keys[int(len(keys)*train_size):]}
         self.keys = list(self.data.keys())
-        print("loaded", len(self.js2data))
+        print("loaded", len(self.js2data), "used", len(self.data))
 
     def __len__(self):
         return len(self.keys)
