@@ -216,7 +216,7 @@ def read_seg_masks_slow(im_dir="/home/sontung/Downloads/5objs_seg/z.seg834_s1_41
     return masks, def_mat, wei_mat, ob_names, name2sg(im_dir.split("/")[-1])
 
 
-def read_seg_masks(im_dir="/home/sontung/Downloads/5objs_seg/z.seg834_s1_4123_s2__s0_0.ppm"):
+def read_seg_masks(im_dir="/home/sontung/Downloads/6objs_seg/z.seg0_s0_012345_s1__s2_.ppm"):
     im_pil = Image.open(im_dir).convert('RGB')
     transform = torchvision.transforms.ToTensor()
     im_mat = transform(im_pil)
@@ -226,7 +226,7 @@ def read_seg_masks(im_dir="/home/sontung/Downloads/5objs_seg/z.seg834_s1_4123_s2
        torch.tensor([194, 128, 64]): 'brown',
        torch.tensor([66, 128, 64]): 'green',
        torch.tensor([194, 0, 64]): 'red',
-       torch.tensor([64, 128, 194]): 'navy'
+       torch.tensor([66, 128, 192]): 'navy'
        }
     ob_names = ['blue', 'pink', 'brown', 'green', 'red', 'navy']
     name2mask = {}
@@ -235,6 +235,7 @@ def read_seg_masks(im_dir="/home/sontung/Downloads/5objs_seg/z.seg834_s1_4123_s2
 
     im_mat = im_mat*255
     im_mat = im_mat.long()
+
     for color in cl2name:
         selected = im_mat[0, :, :]==color[0]
         selected *= im_mat[1, :, :]==color[1]
@@ -262,7 +263,7 @@ def read_seg_masks(im_dir="/home/sontung/Downloads/5objs_seg/z.seg834_s1_4123_s2
 if __name__ == '__main__':
     import time
 
-    for _ in range(100):
+    for _ in range(1):
         start = time.time()
         read_seg_masks()
         end = time.time()
