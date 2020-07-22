@@ -207,6 +207,7 @@ class SimData(Dataset):
         identifier = root_dir.split("/")[-1]
 
         self.scene_jsons = [join(root_dir, f) for f in listdir(root_dir) if isfile(join(root_dir, f))]
+        print("there are %d files total" % len(self.scene_jsons))
         if nb_samples > 0:
             self.scene_jsons = self.scene_jsons[:nb_samples]
 
