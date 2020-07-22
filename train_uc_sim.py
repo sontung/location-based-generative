@@ -28,10 +28,13 @@ NB_SAMPLES = MY_ARGS.nb_samples
 ROOT_DIR = MY_ARGS.dir
 EVAL_DIR = MY_ARGS.eval_dir
 
-DEVICE = "cpu"
-# DEVICE = "cuda:%d" % MY_ARGS.device
+# DEVICE = "cpu"
+DEVICE = "cuda:%d" % MY_ARGS.device
 
-def eval(model_, iter_, name_="1", device_="cuda", debugging=False):
+print("Using", DEVICE)
+
+
+def eval_f(model_, iter_, name_="1", device_="cuda", debugging=False):
     total_loss = 0
     vis = False
     correct = 0
@@ -86,6 +89,7 @@ def eval(model_, iter_, name_="1", device_="cuda", debugging=False):
                     ], "figures/debug-%d.png" % count_, 4)
     return total_loss, correct
 
+
 def train():
     now = datetime.datetime.now()
     writer = SummaryWriter("logs/sim" + now.strftime("%Y%m%d-%H%M%S") + "/")
@@ -95,10 +99,10 @@ def train():
 
     train_data = SimData(root_dir=ROOT_DIR, nb_samples=NB_SAMPLES)
     train_iterator = DataLoader(train_data, batch_size=8, shuffle=True, collate_fn=sim_collate_fn)
-    val_data = SimData(train=False, root_dir=ROOT_DIR, nb_samples=NB_SAMPLES)
+
+    val_data = SimData(train=False, root_dir=EVAL_DIR, nb_samples=NB_SAMPLES, train_size=0.0)
     val_iterator = DataLoader(val_data, batch_size=16, shuffle=False, collate_fn=sim_collate_fn)
-    # val_data2 = SimData(train=False, root_dir=EVAL_DIR, train_size=0.0, nb_samples=NB_SAMPLES)
-    # val_iterator2 = DataLoader(val_data2, batch_size=16, shuffle=False, collate_fn=sim_collate_fn)
+
     model = LocationBasedGenerator()
     model.to(device)
 
@@ -120,14 +124,10 @@ def train():
         writer.add_scalar('train/loss', total_loss/len(train_data), epc)
 
         model.eval()
-        loss, acc = eval(model, val_iterator, name_=str(epc), device_=device, debugging=epc==nb_epochs-1)
+        loss, acc = eval_f(model, val_iterator, name_=str(epc), device_=device, debugging=epc==nb_epochs-1)
         writer.add_scalar('val/loss', loss/len(val_data), epc)
         writer.add_scalar('val/acc', acc/len(val_data), epc)
         print(epc, acc/len(val_data))
-        # loss, acc = eval(model, val_iterator2, name_="-d-"+str(epc), device_=device)
-        # writer.add_scalar('val2/loss', loss / len(val_data2), epc)
-        # writer.add_scalar('val2/acc', acc / len(val_data2), epc)
-        # print(epc, acc / len(val_data2))
 
     torch.save(model.state_dict(), "pre_models/model-sim-%s" % now.strftime("%Y%m%d-%H%M%S"))
 

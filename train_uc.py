@@ -26,7 +26,8 @@ ROOT_DIR = MY_ARGS.dir
 EVAL_DIR = MY_ARGS.eval_dir
 DEVICE = "cuda:%d" % MY_ARGS.device
 
-def eval(model_, iter_, name_="1", device_="cuda"):
+
+def eval_f(model_, iter_, name_="1", device_="cuda"):
     total_loss = 0
     vis = False
     correct = 0
@@ -50,6 +51,7 @@ def eval(model_, iter_, name_="1", device_="cuda"):
             ], "figures/test%s.png" % name_, 4)
             vis = True
     return total_loss, correct
+
 
 def train():
     now = datetime.datetime.now()
@@ -86,15 +88,14 @@ def train():
         writer.add_scalar('train/loss', total_loss/len(train_data), epc)
 
         model.eval()
-        loss, acc = eval(model, val_iterator, name_=str(epc), device_=device)
+        loss, acc = eval_f(model, val_iterator, name_=str(epc), device_=device)
         writer.add_scalar('val/loss', loss/len(val_data), epc)
         writer.add_scalar('val/acc', acc/len(val_data), epc)
         print(epc, acc/len(val_data))
-        loss, acc = eval(model, val_iterator2, name_="-d-"+str(epc), device_=device)
+        loss, acc = eval_f(model, val_iterator2, name_="-d-"+str(epc), device_=device)
         writer.add_scalar('val2/loss', loss / len(val_data2), epc)
         writer.add_scalar('val2/acc', acc / len(val_data2), epc)
         print(epc, acc / len(val_data2))
-
 
     torch.save(model.state_dict(), "pre_models/model-%s" % now.strftime("%Y%m%d-%H%M%S"))
 

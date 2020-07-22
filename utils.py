@@ -7,6 +7,27 @@ import torchvision
 from torchvision.utils import make_grid
 from PIL import Image
 
+def construct_weight_map(bbox):
+    weight_map = torch.ones(128, 128)
+    a_ = 255
+    b_ = 1
+    bbox_int = [int(dm11) for dm11 in bbox]
+
+    weight_map[:, range(0, bbox_int[0]+1)] *= torch.tensor([(b_-a_)*x_/bbox[0]+a_ for x_ in range(0, bbox_int[0]+1)])
+    weight_map[:, range(bbox_int[2], 128)] *= torch.tensor([(a_-b_)*(x_-bbox[2])/(128-bbox[2])+b_ for x_ in range(bbox_int[2], 128)])
+
+    for x_ in range(0, bbox_int[1]+1):
+        weight_map[x_, :] *= (b_-a_)*x_/bbox[1]+a_
+    for x_ in range(bbox_int[3], 128):
+        weight_map[x_, :] *= (a_-b_)*(x_-bbox[3])/(128-bbox[3])+b_
+
+    for x_ in range(bbox_int[0], bbox_int[2] + 1):
+        for y_ in range(bbox_int[1], bbox_int[3] + 1):
+            weight_map[y_, x_] = 0
+
+    weight_map = torch.sqrt(weight_map)
+    return weight_map.unsqueeze(0)
+
 
 def compute_grad(model_):
     res = 0
@@ -135,23 +156,24 @@ def name2sg(name):
         relationships.append([bottoms[0], "left", bottoms[1]])
     return relationships
 
-def return_default_mat(im_tensor):
-    from data_loader import construct_weight_map
 
+def return_default_mat(im_tensor):
     im_np = im_tensor.numpy()[0, :, :]
     a = np.where(im_np != 0)
     bbox_int = np.min(a[1]), np.min(a[0]), np.max(a[1]), np.max(a[0])
+
     default_inp = torch.zeros_like(im_tensor)
     idc1 = range(bbox_int[0], bbox_int[2] + 1)
     idc2 = range(len(idc1))
     for j_, y_ in enumerate(range(bbox_int[1], bbox_int[3] + 1)):
-        default_inp[:, j_ + 128 - int(-bbox_int[1] + bbox_int[3] + 1), idc2] = im_tensor[:, y_, idc1]
+        default_inp[:, j_ + 128 - (-bbox_int[1] + bbox_int[3] + 1), idc2] = im_tensor[:, y_, idc1]
 
     weight = construct_weight_map(bbox_int)
 
     return default_inp, weight
 
-def read_seg_masks(im_dir="/home/sontung/Downloads/5objs_seg/z.seg2153_s2_423_s0_0_s1_1.ppm"):
+
+def read_seg_masks_slow(im_dir="/home/sontung/Downloads/5objs_seg/z.seg834_s1_4123_s2__s0_0.ppm"):
     im_pil = Image.open(im_dir).convert('RGB')
     transform = torchvision.transforms.ToTensor()
     im_mat = transform(im_pil)
@@ -169,7 +191,7 @@ def read_seg_masks(im_dir="/home/sontung/Downloads/5objs_seg/z.seg2153_s2_423_s0
     navy_existed = False
     for i in range(im_mat.size(1)):
         for j in range(im_mat.size(1)):
-            if im_mat[0, i, j].item() == 0:
+            if torch.sum(im_mat[:, i, j]).item() == 0:
                 continue
             color = tuple([
                 int(im_mat[0, i, j].item()*255),
@@ -193,10 +215,53 @@ def read_seg_masks(im_dir="/home/sontung/Downloads/5objs_seg/z.seg2153_s2_423_s0
     return masks, def_mat, wei_mat, ob_names, name2sg(im_dir.split("/")[-1])
 
 
+def read_seg_masks(im_dir="/home/sontung/Downloads/5objs_seg/z.seg834_s1_4123_s2__s0_0.ppm"):
+    im_pil = Image.open(im_dir).convert('RGB')
+    transform = torchvision.transforms.ToTensor()
+    im_mat = transform(im_pil)
+    cl2name = {
+       torch.tensor([66, 0, 192]): 'blue',
+       torch.tensor([194, 0, 192]): 'pink',
+       torch.tensor([194, 128, 64]): 'brown',
+       torch.tensor([66, 128, 64]): 'green',
+       torch.tensor([194, 0, 64]): 'red',
+       torch.tensor([64, 128, 194]): 'navy'
+       }
+    ob_names = ['blue', 'pink', 'brown', 'green', 'red', 'navy']
+    name2mask = {}
+
+    navy_existed = False
+
+    im_mat = im_mat*255
+    im_mat = im_mat.long()
+    for color in cl2name:
+        selected = im_mat[0, :, :]==color[0]
+        selected *= im_mat[1, :, :]==color[1]
+        selected *= im_mat[2, :, :]==color[2]
+
+        mask = im_mat * selected
+        mask = mask.float()/255.0
+        name2mask[cl2name[color]] = mask
+        if not navy_existed:
+            if torch.sum(mask).item() != 0 and cl2name[color] == "navy":
+                navy_existed = True
+
+    if not navy_existed:
+        ob_names.remove("navy")
+        del name2mask["navy"]
+    masks = torch.cat([name2mask[dm4].unsqueeze(0) for dm4 in ob_names], dim=0)
+    def_wei = [return_default_mat(name2mask[dm4]) for dm4 in ob_names]
+    def_mat = torch.cat([dm4[0].unsqueeze(0) for dm4 in def_wei], dim=0)
+    wei_mat = torch.cat([dm4[1].unsqueeze(0) for dm4 in def_wei], dim=0)
+    # show2([masks, def_mat, wei_mat], "masks_test", 5)
+
+    return masks, def_mat, wei_mat, ob_names, name2sg(im_dir.split("/")[-1])
+
+
 if __name__ == '__main__':
     import time
 
-    for _ in range(1000):
+    for _ in range(100):
         start = time.time()
         read_seg_masks()
         end = time.time()
