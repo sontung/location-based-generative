@@ -77,16 +77,17 @@ def eval_f(model_, iter_, name_="1", device_="cuda", debugging=False):
                 correct += res
                 if res == 0:
                     count_ += 1
-                    print(count_, sorted(graphs[i]), sorted(pred_sg[i]), "\n")
-                    show2([
-                        torch.sum(start[i], dim=0).unsqueeze(0).cpu(),
-                        torch.sum(start_pred[i], dim=0).unsqueeze(0).cpu(),
-                        start[i].cpu(),
-                        start_pred[i].cpu(),
-                        start[i].cpu() + start_pred[i].cpu(),
-                        default[i].cpu(),
-                        weight_maps[i].cpu()
-                    ], "figures/debug-%d.png" % count_, 4)
+                    if count_ <= 50:
+                        print(count_, sorted(graphs[i]), sorted(pred_sg[i]), "\n")
+                        show2([
+                            torch.sum(start[i], dim=0).unsqueeze(0).cpu(),
+                            torch.sum(start_pred[i], dim=0).unsqueeze(0).cpu(),
+                            start[i].cpu(),
+                            start_pred[i].cpu(),
+                            start[i].cpu() + start_pred[i].cpu(),
+                            default[i].cpu(),
+                            weight_maps[i].cpu()
+                        ], "figures/debug-%d.png" % count_, 4)
     return total_loss, correct
 
 
@@ -97,8 +98,11 @@ def train():
     nb_epochs = NB_EPOCHS
     device = DEVICE
 
-    train_data = SimData(root_dir=ROOT_DIR, nb_samples=NB_SAMPLES)
+    train_data = SimData(root_dir=ROOT_DIR, nb_samples=NB_SAMPLES, train_size=0.9)
     train_iterator = DataLoader(train_data, batch_size=8, shuffle=True, collate_fn=sim_collate_fn)
+
+    val_data2 = SimData(train=False, root_dir=ROOT_DIR, nb_samples=NB_SAMPLES, train_size=0.9)
+    val_iterator2 = DataLoader(val_data2, batch_size=8, shuffle=True, collate_fn=sim_collate_fn)
 
     val_data = SimData(train=False, root_dir=EVAL_DIR, nb_samples=NB_SAMPLES, train_size=0.0)
     val_iterator = DataLoader(val_data, batch_size=16, shuffle=False, collate_fn=sim_collate_fn)
@@ -127,7 +131,12 @@ def train():
         loss, acc = eval_f(model, val_iterator, name_=str(epc), device_=device, debugging=epc==nb_epochs-1)
         writer.add_scalar('val/loss', loss/len(val_data), epc)
         writer.add_scalar('val/acc', acc/len(val_data), epc)
-        print(epc, acc/len(val_data))
+        print(epc, acc/len(val_data), loss/len(val_data))
+
+        loss, acc = eval_f(model, val_iterator2, name_=str(epc), device_=device)
+        writer.add_scalar('val/loss', loss / len(val_data2), epc)
+        writer.add_scalar('val/acc', acc / len(val_data2), epc)
+        print(epc, acc / len(val_data), loss / len(val_data2))
 
     torch.save(model.state_dict(), "pre_models/model-sim-%s" % now.strftime("%Y%m%d-%H%M%S"))
 
