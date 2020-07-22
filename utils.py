@@ -134,7 +134,8 @@ def name2sg(name):
         1: "green",
         2: "brown",
         3: "blue",
-        4: "pink"
+        4: "pink",
+        5: "navy"
     }
     infor = name.split("_")[1:]
     bottoms = [0, 0, 0]
