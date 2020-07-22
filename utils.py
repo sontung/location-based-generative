@@ -155,6 +155,8 @@ def name2sg(name):
         relationships.append([bottoms[1], "left", bottoms[2]])
     if bottoms[0] != 0 and bottoms[1] != 0:
         relationships.append([bottoms[0], "left", bottoms[1]])
+    if bottoms[0] != 0 and bottoms[2] != 0 and bottoms[1] == 0:
+        relationships.append([bottoms[0], "left", bottoms[2]])
     return relationships
 
 
@@ -257,7 +259,7 @@ def read_seg_masks(im_dir="/home/sontung/Downloads/6objs_seg/z.seg0_s0_012345_s1
     wei_mat = torch.cat([dm4[1].unsqueeze(0) for dm4 in def_wei], dim=0)
     # show2([masks, def_mat, wei_mat], "masks_test", 5)
 
-    return masks, def_mat, wei_mat, ob_names, name2sg(im_dir.split("/")[-1])
+    return masks, def_mat, wei_mat, ob_names, name2sg(im_dir.split("/")[-1]), im_dir.split("/")[-1]
 
 
 if __name__ == '__main__':

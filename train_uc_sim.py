@@ -41,7 +41,7 @@ def eval_f(model_, iter_, name_="1", device_="cuda", debugging=False):
     if not debugging:
         for idx, train_batch in enumerate(iter_):
             start, default, weight_maps = [tensor.to(device_) for tensor in train_batch[:3]]
-            graphs, ob_names = train_batch[3:]
+            graphs, ob_names, _ = train_batch[3:]
             with torch.no_grad():
                 loss, start_pred = model_(start, default, weight_maps)
                 pred_sg = model_.return_sg(start, ob_names)
@@ -67,7 +67,7 @@ def eval_f(model_, iter_, name_="1", device_="cuda", debugging=False):
         count_ = 0
         for idx, train_batch in enumerate(iter_):
             start, default, weight_maps = [tensor.to(device_) for tensor in train_batch[:3]]
-            graphs, ob_names = train_batch[3:]
+            graphs, ob_names, im_names = train_batch[3:]
             with torch.no_grad():
                 loss, start_pred = model_(start, default, weight_maps)
                 pred_sg = model_.return_sg(start, ob_names)
@@ -78,7 +78,7 @@ def eval_f(model_, iter_, name_="1", device_="cuda", debugging=False):
                 if res == 0:
                     count_ += 1
                     if count_ <= 50:
-                        print(count_, sorted(graphs[i]), sorted(pred_sg[i]), "\n")
+                        print(count_, im_names[i], sorted(graphs[i]), sorted(pred_sg[i]), "\n")
                         show2([
                             torch.sum(start[i], dim=0).unsqueeze(0).cpu(),
                             torch.sum(start_pred[i], dim=0).unsqueeze(0).cpu(),
@@ -98,7 +98,7 @@ def train():
     nb_epochs = NB_EPOCHS
     device = DEVICE
 
-    train_data = SimData(root_dir=ROOT_DIR, nb_samples=NB_SAMPLES, train_size=0.9)
+    train_data = SimData(root_dir=ROOT_DIR, nb_samples=NB_SAMPLES, train_size=0.95)
     train_iterator = DataLoader(train_data, batch_size=8, shuffle=True, collate_fn=sim_collate_fn)
 
     val_data2 = SimData(train=False, root_dir=ROOT_DIR, nb_samples=NB_SAMPLES, train_size=0.9)
@@ -136,7 +136,7 @@ def train():
         loss, acc = eval_f(model, val_iterator2, name_=str(epc), device_=device)
         writer.add_scalar('val/loss', loss / len(val_data2), epc)
         writer.add_scalar('val/acc', acc / len(val_data2), epc)
-        print(epc, acc / len(val_data), loss / len(val_data2))
+        print(epc, acc / len(val_data2), loss / len(val_data2))
 
     torch.save(model.state_dict(), "pre_models/model-sim-%s" % now.strftime("%Y%m%d-%H%M%S"))
 

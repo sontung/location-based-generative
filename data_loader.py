@@ -364,18 +364,20 @@ def sim_collate_fn(batch):
     all_imgs, all_imgs2, weights = [], [], []
     sgs = []
     names = []
-    for masks, def_mat, def_wei, ob_names, sg in batch:
+    im_names = []
+    for masks, def_mat, def_wei, ob_names, sg, im_name in batch:
         all_imgs.append(masks.unsqueeze(0))
         all_imgs2.append(def_mat.unsqueeze(0))
         weights.append(def_wei.unsqueeze(0))
         sgs.append(sg)
         names.append(ob_names)
+        im_names.append(im_name)
 
     all_imgs = torch.cat(all_imgs)
     all_imgs2 = torch.cat(all_imgs2)
     weights = torch.cat(weights)
 
-    return all_imgs, all_imgs2, weights, sgs, names
+    return all_imgs, all_imgs2, weights, sgs, names, im_names
 
 def pbw_collate_fn(batch):
     all_imgs, all_targets, all_imgs2, weights = [], [], [], []
