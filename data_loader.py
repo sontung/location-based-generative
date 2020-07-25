@@ -209,6 +209,7 @@ class SimData(Dataset):
         self.scene_jsons = [join(root_dir, f) for f in listdir(root_dir) if isfile(join(root_dir, f))]
         print("there are %d files total" % len(self.scene_jsons))
         if nb_samples > 0:
+            random.shuffle(self.scene_jsons)
             self.scene_jsons = self.scene_jsons[:nb_samples]
 
         name = "json2sg-%s-%d" % (identifier, nb_samples)

@@ -9,7 +9,7 @@ sae = LocationBasedGenerator()
 sae.to(device)
 sae.load_state_dict(torch.load("pre_models/model-20200718-122629", map_location=device))
 
-val_data2 = PBW(train=False, root_dir="/home/sontung/thesis/photorealistic-blocksworld/blocks-5-3",
+val_data2 = PBW(train=False, root_dir="/home/sontung/Downloads/6objs_seg",
                 train_size=0.0, nb_samples=1000)
 val_iterator2 = DataLoader(val_data2, batch_size=16, shuffle=False, collate_fn=pbw_collate_fn)
 

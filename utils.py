@@ -135,7 +135,8 @@ def name2sg(name):
         2: "brown",
         3: "blue",
         4: "pink",
-        5: "navy"
+        5: "navy",
+        6: "pink2",
     }
     infor = name.split("_")[1:]
     bottoms = [0, 0, 0]
@@ -218,7 +219,7 @@ def read_seg_masks_slow(im_dir="/home/sontung/Downloads/5objs_seg/z.seg834_s1_41
     return masks, def_mat, wei_mat, ob_names, name2sg(im_dir.split("/")[-1])
 
 
-def read_seg_masks(im_dir="/home/sontung/Downloads/6objs_seg/z.seg0_s0_012345_s1__s2_.ppm"):
+def read_seg_masks(im_dir="/home/sontung/Downloads/7objs_7k/z.seg346_s1_3420615_s2__s0_.ppm"):
     im_pil = Image.open(im_dir).convert('RGB')
     transform = torchvision.transforms.ToTensor()
     im_mat = transform(im_pil)
@@ -228,15 +229,33 @@ def read_seg_masks(im_dir="/home/sontung/Downloads/6objs_seg/z.seg0_s0_012345_s1
        torch.tensor([194, 128, 64]): 'brown',
        torch.tensor([66, 128, 64]): 'green',
        torch.tensor([194, 0, 64]): 'red',
-       torch.tensor([66, 128, 192]): 'navy'
-       }
-    ob_names = ['blue', 'pink', 'brown', 'green', 'red', 'navy']
+       torch.tensor([66, 128, 192]): 'navy',
+        torch.tensor([194, 128, 192]): 'pink2',
+
+    }
+    ob_names = ['blue', 'pink', 'brown', 'green', 'red', 'navy', 'pink2']
     name2mask = {}
 
     navy_existed = False
+    pink2_existed = False
 
     im_mat = im_mat*255
     im_mat = im_mat.long()
+
+    # # pick color
+    # colors = []
+    # for i in range(im_mat.size(1)):
+    #     for j in range(im_mat.size(1)):
+    #         if torch.sum(im_mat[:, i, j]).item() == 0:
+    #             continue
+    #         color = tuple([
+    #             int(im_mat[0, i, j].item()),
+    #             int(im_mat[1, i, j].item()),
+    #             int(im_mat[2, i, j].item()),
+    #             ])
+    #         if color not in colors:
+    #             colors.append(color)
+    #             print(color)
 
     for color in cl2name:
         selected = im_mat[0, :, :]==color[0]
@@ -249,10 +268,16 @@ def read_seg_masks(im_dir="/home/sontung/Downloads/6objs_seg/z.seg0_s0_012345_s1
         if not navy_existed:
             if torch.sum(mask).item() != 0 and cl2name[color] == "navy":
                 navy_existed = True
+        if not pink2_existed:
+            if torch.sum(mask).item() != 0 and cl2name[color] == "pink2":
+                pink2_existed = True
 
     if not navy_existed:
         ob_names.remove("navy")
         del name2mask["navy"]
+    if not pink2_existed:
+        ob_names.remove("pink2")
+        del name2mask["pink2"]
     masks = torch.cat([name2mask[dm4].unsqueeze(0) for dm4 in ob_names], dim=0)
     def_wei = [return_default_mat(name2mask[dm4]) for dm4 in ob_names]
     def_mat = torch.cat([dm4[0].unsqueeze(0) for dm4 in def_wei], dim=0)
@@ -261,6 +286,18 @@ def read_seg_masks(im_dir="/home/sontung/Downloads/6objs_seg/z.seg0_s0_012345_s1
 
     return masks, def_mat, wei_mat, ob_names, name2sg(im_dir.split("/")[-1]), im_dir.split("/")[-1]
 
+def compute_iou(pred, true):
+    pred = torch.sum(pred.view(-1, 3, 128, 128), dim=1)
+    true = torch.sum(true.view(-1, 3, 128, 128), dim=1)
+    pred[pred.nonzero(as_tuple=True)] = 128
+    true[true.nonzero(as_tuple=True)] = 128
+    total = pred+true
+    res = []
+    for i in range(total.size(0)):
+        intersect = torch.sum(total[i].flatten()==256).item()
+        union = torch.sum(total[i].flatten()==128).item()
+        res.append(intersect/(intersect+union)*1.0)
+    return res, np.mean(res)
 
 if __name__ == '__main__':
     import time
