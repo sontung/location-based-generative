@@ -18,7 +18,7 @@ from PIL import Image
 
 class PBW(Dataset):
     def __init__(self, root_dir="/home/sontung/thesis/photorealistic-blocksworld/blocks-6-3",
-                 train=True, train_size=0.6, nb_samples=1000, json2im=None):
+                 train=True, train_size=0.6, nb_samples=1000, json2im=None, if_save_data=True):
         print("Loading from", root_dir)
         super(PBW, self).__init__()
         self.root_dir = root_dir
@@ -40,8 +40,9 @@ class PBW(Dataset):
             self.json2sg = {}
             for js in self.scene_jsons:
                 self.json2sg[js] = read_scene_json(js)
-            with open("data/json2sg-%s" % identifier, 'wb') as f:
-                pickle.dump(self.json2sg, f, pickle.HIGHEST_PROTOCOL)
+            if if_save_data:
+                with open("data/json2sg-%s" % identifier, 'wb') as f:
+                    pickle.dump(self.json2sg, f, pickle.HIGHEST_PROTOCOL)
 
         if json2im is None:
             self.json2im = self.load_json2im(nb_samples=nb_samples)
@@ -199,7 +200,7 @@ class PBW_Planning_only(Dataset):
 
 class SimData(Dataset):
     def __init__(self, root_dir="/home/sontung/Downloads/5objs_seg", nb_samples=10,
-                 train=True, train_size=0.6):
+                 train=True, train_size=0.6, if_save_data=True):
         print("Loading from", root_dir)
         super(SimData, self).__init__()
         self.root_dir = root_dir
@@ -221,8 +222,9 @@ class SimData(Dataset):
             self.js2data = {}
             for js in self.scene_jsons:
                 self.js2data[js] = read_seg_masks(js)
-            with open("data/%s" % name, 'wb') as f:
-                pickle.dump(self.js2data, f, pickle.HIGHEST_PROTOCOL)
+            if if_save_data:
+                with open("data/%s" % name, 'wb') as f:
+                    pickle.dump(self.js2data, f, pickle.HIGHEST_PROTOCOL)
 
         keys = list(self.js2data.keys())
         if train:

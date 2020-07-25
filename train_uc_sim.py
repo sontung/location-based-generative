@@ -17,6 +17,8 @@ PARSER.add_argument("--dir", help="train directory",
 PARSER.add_argument("--eval_dir", help="2nd domain evaluation directory",
                     default="/home/sontung/Downloads/6objs_seg", type=str)
 PARSER.add_argument("--nb_samples", help="how many samples", default=10, type=int)
+PARSER.add_argument("--save_data", help="wheather to save processed data", default=1, type=int)
+
 PARSER.add_argument("--epc", help="how many epochs", default=1, type=int)
 
 PARSER.add_argument("--device", help="gpu device", default=0, type=int)
@@ -27,6 +29,7 @@ NB_EPOCHS = MY_ARGS.epc
 NB_SAMPLES = MY_ARGS.nb_samples
 ROOT_DIR = MY_ARGS.dir
 EVAL_DIR = MY_ARGS.eval_dir
+SAVE_DATA = MY_ARGS.save_data == 1
 
 # DEVICE = "cpu"
 DEVICE = "cuda:%d" % MY_ARGS.device
