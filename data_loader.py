@@ -67,6 +67,8 @@ class PBW(Dataset):
                 return pickle.load(f)
         else:
             res_dict = {}
+            if nb_samples > 0:
+                random.shuffle(self.scene_jsons)
             for item in range(len(self.scene_jsons))[:nb_samples]:
                 bboxes, coords, obj_names, img_name = self.json2sg[self.scene_jsons[item]]
                 sg = recon_sg2(self.scene_jsons[item])
