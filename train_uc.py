@@ -18,6 +18,7 @@ PARSER.add_argument("--eval_dir", help="2nd domain evaluation directory",
                     default="/scratch/mlr/nguyensg/pbw/blocks-5-3", type=str)
 PARSER.add_argument("--nb_samples", help="how many samples", default=1000, type=int)
 PARSER.add_argument("--device", help="gpu device", default=0, type=int)
+PARSER.add_argument("--save_data", help="wheather to save processed data", default=1, type=int)
 
 MY_ARGS = PARSER.parse_args()
 
@@ -25,6 +26,7 @@ NB_SAMPLES = MY_ARGS.nb_samples
 ROOT_DIR = MY_ARGS.dir
 EVAL_DIR = MY_ARGS.eval_dir
 DEVICE = "cuda:%d" % MY_ARGS.device
+SAVE_DATA = MY_ARGS.save_data == 1
 
 
 def eval_f(model_, iter_, name_="1", device_="cuda"):
@@ -65,7 +67,7 @@ def train():
     train_data = PBW(root_dir=ROOT_DIR, nb_samples=NB_SAMPLES, train_size=1.0)
     train_iterator = DataLoader(train_data, batch_size=8, shuffle=True, collate_fn=pbw_collate_fn)
 
-    val_data2 = PBW(train=False, root_dir=EVAL_DIR, train_size=0.0, nb_samples=NB_SAMPLES)
+    val_data2 = PBW(train=False, root_dir=EVAL_DIR, train_size=0.0, nb_samples=NB_SAMPLES, if_save_data=SAVE_DATA)
     val_iterator2 = DataLoader(val_data2, batch_size=16, shuffle=False, collate_fn=pbw_collate_fn)
     model = LocationBasedGenerator()
     model.to(device)

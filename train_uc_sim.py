@@ -104,7 +104,7 @@ def train():
     train_data = SimData(root_dir=ROOT_DIR, nb_samples=NB_SAMPLES, train_size=1.0)
     train_iterator = DataLoader(train_data, batch_size=8, shuffle=True, collate_fn=sim_collate_fn)
 
-    val_data = SimData(train=False, root_dir=EVAL_DIR, nb_samples=NB_SAMPLES, train_size=0.0)
+    val_data = SimData(train=False, root_dir=EVAL_DIR, nb_samples=NB_SAMPLES, train_size=0.0, if_save_data=SAVE_DATA)
     val_iterator = DataLoader(val_data, batch_size=16, shuffle=False, collate_fn=sim_collate_fn)
 
     model = LocationBasedGenerator()
