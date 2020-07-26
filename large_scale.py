@@ -76,7 +76,7 @@ if __name__ == '__main__':
     for data_dir in data_dirs:
         val_data2 = SimData(train=False,
                             root_dir=data_dir,
-                            train_size=0.0, nb_samples=5000)
+                            train_size=0.0, nb_samples=5000, if_save_data=False)
         TOTAL = len(val_data2)
         val_iterator2 = DataLoader(val_data2, batch_size=16, shuffle=False, collate_fn=sim_collate_fn)
         res = eval_f(sae, val_iterator2, TOTAL, device)
