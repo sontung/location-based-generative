@@ -118,6 +118,7 @@ class PBW(Dataset):
     def __getitem__(self, item):
         return self.data[self.keys[item]]
 
+
 class PBW_Planning_only(Dataset):
     def __init__(self, root_dir="/home/sontung/thesis/photorealistic-blocksworld/blocks-6-3",
                  train=True, train_size=0.6, nb_samples=1000, json2im=None):

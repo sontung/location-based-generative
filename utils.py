@@ -182,13 +182,13 @@ def read_seg_masks_slow(im_dir="/home/sontung/Downloads/5objs_seg/z.seg834_s1_41
     transform = torchvision.transforms.ToTensor()
     im_mat = transform(im_pil)
     cl2name = {
-       (66, 0, 192): 'blue', 
-       (194, 0, 192): 'pink',
-       (194, 128, 64): 'brown', 
-       (66, 128, 64): 'green', 
-       (194, 0, 64): 'red',
-       (64, 128, 194): 'navy'
-       }
+        (66, 0, 192): 'blue',
+        (194, 0, 192): 'pink',
+        (194, 128, 64): 'brown',
+        (66, 128, 64): 'green',
+        (194, 0, 64): 'red',
+        (64, 128, 194): 'navy'
+    }
     ob_names = ['blue', 'pink', 'brown', 'green', 'red', 'navy']
     name2mask = {dm3: torch.zeros(3, 128, 128) for dm3 in ob_names}
 
@@ -201,7 +201,7 @@ def read_seg_masks_slow(im_dir="/home/sontung/Downloads/5objs_seg/z.seg834_s1_41
                 int(im_mat[0, i, j].item()*255),
                 int(im_mat[1, i, j].item()*255),
                 int(im_mat[2, i, j].item()*255),
-                ])
+            ])
             if not navy_existed:
                 if cl2name[color] == "navy":
                     navy_existed = True
@@ -224,12 +224,12 @@ def read_seg_masks(im_dir="/home/sontung/Downloads/7objs_7k/z.seg346_s1_3420615_
     transform = torchvision.transforms.ToTensor()
     im_mat = transform(im_pil)
     cl2name = {
-       torch.tensor([66, 0, 192]): 'blue',
-       torch.tensor([194, 0, 192]): 'pink',
-       torch.tensor([194, 128, 64]): 'brown',
-       torch.tensor([66, 128, 64]): 'green',
-       torch.tensor([194, 0, 64]): 'red',
-       torch.tensor([66, 128, 192]): 'navy',
+        torch.tensor([66, 0, 192]): 'blue',
+        torch.tensor([194, 0, 192]): 'pink',
+        torch.tensor([194, 128, 64]): 'brown',
+        torch.tensor([66, 128, 64]): 'green',
+        torch.tensor([194, 0, 64]): 'red',
+        torch.tensor([66, 128, 192]): 'navy',
         torch.tensor([194, 128, 192]): 'pink2',
 
     }
@@ -285,6 +285,7 @@ def read_seg_masks(im_dir="/home/sontung/Downloads/7objs_7k/z.seg346_s1_3420615_
     # show2([masks, def_mat, wei_mat], "masks_test", 5)
 
     return masks, def_mat, wei_mat, ob_names, name2sg(im_dir.split("/")[-1]), im_dir.split("/")[-1]
+
 
 def compute_iou(pred, true):
     pred = torch.sum(pred.view(-1, 3, 128, 128), dim=1)
