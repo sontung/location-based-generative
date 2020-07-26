@@ -154,7 +154,7 @@ class LocationBasedGenerator(nn.Module):
             res.append(sg)
         return res
 
-    def forward(self, x, x_default, weights):
+    def forward(self, x, x_default, weights, using_weights=False):
         nb_objects = x.size(1)
 
         # single
@@ -163,7 +163,12 @@ class LocationBasedGenerator(nn.Module):
         weights = weights.view(-1, 128, 128)
         pred = self.infer(x, x_default)
         pos_loss = nn.functional.mse_loss(pred, x[:, :3, :, :], reduction="none")
-        pos_loss = torch.mean(pos_loss, dim=1) * weights.squeeze()
+
+        if using_weights:
+            pos_loss = torch.mean(pos_loss, dim=1) * weights.squeeze()
+        else:
+            pos_loss = torch.mean(pos_loss, dim=1)
+            
         pos_loss = pos_loss.mean()
         zeros = torch.zeros_like(pos_loss)
         hinge = nn.functional.mse_loss(x_default, x[:, :3, :, :])

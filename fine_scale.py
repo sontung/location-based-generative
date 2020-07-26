@@ -68,7 +68,7 @@ def analyze():
     device = "cuda"
     sae = LocationBasedGenerator()
     sae.to(device)
-    sae.load_state_dict(torch.load("pre_models/model-sim-20200721-164922", map_location=device))
+    sae.load_state_dict(torch.load("pre_models/model-sim-20200725-114336", map_location=device))
 
     for color in name2color:
         for shape in shape2func:
