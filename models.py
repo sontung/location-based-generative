@@ -168,7 +168,7 @@ class LocationBasedGenerator(nn.Module):
             pos_loss = torch.mean(pos_loss, dim=1) * weights.squeeze()
         else:
             pos_loss = torch.mean(pos_loss, dim=1)
-            
+
         pos_loss = pos_loss.mean()
         zeros = torch.zeros_like(pos_loss)
         hinge = nn.functional.mse_loss(x_default, x[:, :3, :, :])
