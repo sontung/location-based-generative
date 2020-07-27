@@ -14,7 +14,8 @@ sae.load_state_dict(torch.load("pre_models/model-sim-20200725-114336", map_locat
 # root_dir = "/home/sontung/Downloads"
 
 data_dirs = [
-    "/home/sontung/thesis/photorealistic-blocksworld/blocks-6-3"
+    # "/home/sontung/thesis/photorealistic-blocksworld/blocks-6-3",
+    "/scratch/mlr/nguyensg/data/blocks-6-3"
 ]
 
 
