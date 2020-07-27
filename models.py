@@ -154,7 +154,7 @@ class LocationBasedGenerator(nn.Module):
             res.append(sg)
         return res
 
-    def forward(self, x, x_default, weights, using_weights=False):
+    def forward(self, x, x_default, weights, using_weights=True):
         nb_objects = x.size(1)
 
         # single
