@@ -69,7 +69,9 @@ def analyze():
     sae = LocationBasedGenerator()
     sae.to(device)
     sae.load_state_dict(torch.load("pre_models/model-sim-20200725-114336", map_location=device))
-
+    
+    color_data = {}
+    shape_data = {}
     for color in name2color:
         for shape in shape2func:
             root_dir = "data/fine-scale/%s-%s" % (color, shape)
@@ -94,6 +96,32 @@ def analyze():
                 ious.extend(compute_iou(pred, batch)[0])
                 # show2([pred.cpu(), batch.cpu(), def_mat.cpu()], "test", 4)
             print(root_dir, np.mean(ious))
+            
+            if color not in color_data:
+                color_data[color] = [np.mean(ious)]
+            else:
+                color_data[color].append(np.mean(ious))
+            
+            if shape not in shape_data:
+                shape_data[shape] = [np.mean(ious)]
+            else:
+                shape_data[shape].append(np.mean(ious))
+    
+    du1, du2 = [], []
+    for c in color_data:
+        dm1, dm2 = np.mean(color_data[c]), np.var(color_data[c])
+        du1.append(dm1)
+        du2.append(dm2)
+        print(dm1, dm2)
+    print(np.mean(du1), np.mean(du2))
+    print()
+    du1, du2 = [], []
+    for c in shape_data:
+        dm1, dm2 = np.mean(shape_data[c]), np.var(shape_data[c])
+        du1.append(dm1)
+        du2.append(dm2)
+        print(dm1, dm2)
+    print(np.mean(du1), np.mean(du2))
 
 
 def random_colors():
