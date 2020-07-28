@@ -10,17 +10,14 @@ device = "cuda"
 sae = LocationBasedGenerator()
 sae.to(device)
 sae.load_state_dict(torch.load("pre_models/model-sim-20200725-114336", map_location=device))
-
+sae.eval()
 # root_dir = "/home/sontung/Downloads"
 root_dir = "/scratch/mlr/nguyensg/pbw"
 
 data_dirs = [
-    "%s/7objs_7k" % root_dir,
-    # "%s/6obs_view18deg" % root_dir,
-    "%s/6objs_view15degRight" % root_dir,
+    "%s/6objs_view15degLeft" % root_dir,
     "%s/6objs_view10degRight" % root_dir,
-    "%s/6objs_view5degLeft" % root_dir,
-    "%s/6objs_view2degLeft" % root_dir,
+    "%s/6objs_view5Left" % root_dir,
 ]
 
 

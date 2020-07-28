@@ -69,7 +69,7 @@ def analyze():
     sae = LocationBasedGenerator()
     sae.to(device)
     sae.load_state_dict(torch.load("pre_models/model-sim-20200725-114336", map_location=device))
-    
+    sae.eval()
     color_data = {}
     shape_data = {}
     for color in name2color:
