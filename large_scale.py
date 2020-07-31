@@ -15,9 +15,11 @@ sae.eval()
 root_dir = "/scratch/mlr/nguyensg/pbw"
 
 data_dirs = [
-    "%s/6objs_view15degLeft" % root_dir,
-    "%s/6objs_view10degRight" % root_dir,
-    "%s/6objs_view5Left" % root_dir,
+    "%s/6objs_seg" % root_dir,
+    "%s/7objs_7k" % root_dir,
+    # "%s/6objs_view15degLeft" % root_dir,
+    # "%s/6objs_view10degRight" % root_dir,
+    # "%s/6objs_view5Left" % root_dir,
 ]
 
 

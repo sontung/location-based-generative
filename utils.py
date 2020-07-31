@@ -4,6 +4,7 @@ import matplotlib
 matplotlib.use('Agg')
 import numpy as np
 import torchvision
+import more_itertools
 from torchvision.utils import make_grid
 from PIL import Image
 
@@ -57,7 +58,7 @@ def show2(im_, name, nrow):
     plt.close(fig_)
     logger.setLevel(old_level)
 
-def recon_sg(obj_names, locations, if_return_assigns=False):
+def recon_sg(obj_names, locations, nb_clusters, if_return_assigns=False):
     """
     reconstruct a sg from object names and coordinates
     """
@@ -70,7 +71,10 @@ def recon_sg(obj_names, locations, if_return_assigns=False):
         locations = np.array(locations)
 
     locations = locations.reshape(-1, 2)
-    k_means_assign = kmeans(locations[:, 0])
+    k_means_assign = kmeans(locations[:, 0], nb_clusters)
+
+    if nb_clusters == 1:
+        k_means_assign = [0]*len(obj_names)
 
     for idx, object_id in enumerate(obj_names):
         a_key = k_means_assign[idx]
@@ -94,15 +98,34 @@ def recon_sg(obj_names, locations, if_return_assigns=False):
     # decide left relation
     bottoms = sorted(bottoms, key=lambda x: x[2])
 
+
     if len(bottoms) > 1:
         relationships.append([bottoms[0][0], "left", bottoms[1][0]])
     if len(bottoms) > 2:
         relationships.append([bottoms[1][0], "left", bottoms[2][0]])
     if if_return_assigns:
-        return relationships, k_means_assign
+        return relationships,
+
     return relationships
 
-def kmeans(data_):
+def find_nb_blocks(scene_image):
+    all_res = []
+    for i in range(127, -1, -1):
+        indices = scene_image[i].nonzero().squeeze().cpu().numpy()
+        try:
+            if len(indices) > 0:
+                res = [list(group) for group in more_itertools.consecutive_groups(indices)]
+                if len(res) == 3:
+                    return 3
+                else:
+                    all_res.append(len(res))
+        except TypeError:
+            pass
+    return max(all_res)
+
+
+
+def kmeans(data_, nb_clusters):
     """
     assign each object one of 3 block IDs based on the x coord
     :param data_:
@@ -114,17 +137,15 @@ def kmeans(data_):
     c_list = [c1, c2, c3]
     init_c_list = c_list[:]
     assign = [0]*len(data_)
-    # print(data_)
-    # print(data_.shape)
+
     for _ in range(10):
         for idx, d in enumerate(data_):
-            assign[idx] = min([0, 1, 2], key=lambda x: (c_list[x]-d)**2)
+            assign[idx] = min(list(range(nb_clusters)), key=lambda x: (c_list[x]-d)**2)
 
-        for c in range(3):
+        for c in range(nb_clusters):
             stuff = [d for idx, d in enumerate(data_) if assign[idx] == c]
             if len(stuff) > 0:
                 c_list[c] = sum(stuff)/len(stuff)
-    # print(sorted(c_list), sorted(init_c_list), data_)
     return assign
 
 def name2sg(name):
@@ -282,7 +303,7 @@ def read_seg_masks(im_dir="/home/sontung/Downloads/7objs_7k/z.seg346_s1_3420615_
     def_wei = [return_default_mat(name2mask[dm4]) for dm4 in ob_names]
     def_mat = torch.cat([dm4[0].unsqueeze(0) for dm4 in def_wei], dim=0)
     wei_mat = torch.cat([dm4[1].unsqueeze(0) for dm4 in def_wei], dim=0)
-    # show2([masks, def_mat, wei_mat], "masks_test", 5)
+    show2([masks[:3], def_mat[:3]], "masks_test", 5)
 
     return masks, def_mat, wei_mat, ob_names, name2sg(im_dir.split("/")[-1]), im_dir.split("/")[-1]
 

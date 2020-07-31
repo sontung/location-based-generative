@@ -162,13 +162,13 @@ def command_by_sg_sg(start_sg, end_sg, ob_names):
     return traces, actions
 
 
-def visualize_plan(im_list):
+def visualize_plan(im_list, perrow=9):
     im_tensors = []
     transform = torchvision.transforms.ToTensor()
     for im_name in im_list:
         im_tensors.append(transform(Image.open(im_name).convert('RGB')).unsqueeze(0))
     im_tensors = torch.cat(im_tensors, dim=0)
-    show2([im_tensors], "solution", 9)
+    show2([im_tensors], "solution", perrow)
 
 
 def command_by_im_im(model_, device="cuda", name="blocks-5-3-2520-planning", domain_task="blocks-5-3",
@@ -186,35 +186,40 @@ def command_by_im_im(model_, device="cuda", name="blocks-5-3-2520-planning", dom
         sg2im[k] = dm3.replace("json", "png").replace("scene", "image")
 
     keys = list(js2mask.keys())
-    before_name = random.choice(keys)
-    after_name = random.choice(keys)
-    start = js2mask[before_name][0].to(device)
-    ob_names1 = js2mask[before_name][-1]
-    end = js2mask[after_name][0].to(device)
-    ob_names2 = js2mask[after_name][-1]
+    all_plans = []
+    for _ in range(10):
+        before_name = random.choice(keys)
+        after_name = random.choice(keys)
+        start = js2mask[before_name][0].to(device)
+        ob_names1 = js2mask[before_name][-1]
+        end = js2mask[after_name][0].to(device)
+        ob_names2 = js2mask[after_name][-1]
 
-    assert ob_names1 == ob_names2 == ob_names[0]
+        assert ob_names1 == ob_names2 == ob_names[0]
 
-    print("planning from %s to %s" % (before_name.split("/")[-1], after_name.split("/")[-1]))
-    input_images = torch.cat([start, end], dim=0).to(device)
-    with torch.no_grad():
-        sg_from, sg_to = model_.return_sg(input_images, ob_names)
-    print("start", sg_from)
-    print("end", sg_to)
-    tr, ac = command_by_sg_sg(sg_from, sg_to, ob_names[0])
-    print(ac)
+        print("planning from %s to %s" % (before_name.split("/")[-1], after_name.split("/")[-1]))
+        input_images = torch.cat([start, end], dim=0).to(device)
+        with torch.no_grad():
+            sg_from, sg_to = model_.return_sg(input_images, ob_names)
+        print("start", sg_from)
+        print("end", sg_to)
+        tr, ac = command_by_sg_sg(sg_from, sg_to, ob_names[0])
+        print(ac)
 
-    image_list = []
-    for t in tr:
-        image_list.append(sg2im[t])
-    visualize_plan(image_list)
+        image_list = []
+        for t in tr:
+            image_list.append(sg2im[t])
+            if len(image_list) == 5:
+                all_plans.extend(image_list)
+                break
+    visualize_plan(all_plans[:15], perrow=5)
 
 
 def command_by_sg_sg_partial(name="blocks-5-3-2520-planning"):
     sg_from = [['red', 'up', 'yellow'], ['yellow', 'up', 'purple'], ['green', 'up', 'blue'],
                ['blue', 'up', 'gray'], ['gray', 'up', 'cyan'], ['brown', 'left', 'purple'],
                ['purple', 'left', 'cyan']]
-    sg_to = [['yellow', 'up', 'gray'], ['blue', 'up', 'red']]
+    sg_to = [['yellow', 'up', 'gray'], ['blue', 'up', 'red'], ["green", "up", "cyan"]]
     ob_names = ['brown', 'purple', 'cyan', 'gray', 'blue', 'red', 'green', 'yellow']
     tr, ac = command_by_sg_sg(sg_from, sg_to, ob_names)
 
@@ -240,7 +245,7 @@ if __name__ == '__main__':
     device = "cuda"
     sae = LocationBasedGenerator()
     sae.to(device)
-    sae.load_state_dict(torch.load("pre_models/model-20200718-122629", map_location=device))
+    sae.load_state_dict(torch.load("pre_models/model-20200726-041935", map_location=device))
 
-    command_by_sg_sg_partial()
+    command_by_im_im(sae)
 
