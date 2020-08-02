@@ -86,8 +86,8 @@ class LocationBasedGenerator(nn.Module):
         res = []
         for i in range(batch_size):
             sg = recon_sg(ob_names[i], trans_vec[i], nb_blocks_per_img[i])
-            res.append(sg)
-        return res, nb_blocks_per_img
+            res.append(sorted(sg))
+        return res
 
     def forward(self, x, x_default, weights, using_weights=True):
         nb_objects = x.size(1)

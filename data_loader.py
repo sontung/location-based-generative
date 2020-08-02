@@ -243,6 +243,71 @@ class SimData(Dataset):
     def __getitem__(self, item):
         return self.data[self.keys[item]]
 
+class SimDataEval(Dataset):
+    def __init__(self, root_dir, start_idx, end_idx,
+                 train=True, train_size=0.6, if_save_data=True):
+        print("Loading from", root_dir)
+        super(SimDataEval, self).__init__()
+        self.root_dir = root_dir
+        self.train = train
+        identifier = root_dir.split("/")[-1]
+
+        self.scene_jsons = [join(root_dir, f) for f in listdir(root_dir) if isfile(join(root_dir, f))]
+        print("there are %d files total" % len(self.scene_jsons))
+        self.scene_jsons = self.scene_jsons[start_idx: end_idx]
+        nb_samples = end_idx-start_idx
+
+        name = "json2sg-%s-%d" % (identifier, nb_samples)
+
+        self.js2data = {}
+        for js in self.scene_jsons:
+            self.js2data[js] = read_seg_masks(js)
+
+        keys = list(self.js2data.keys())
+        if train:
+            self.data = {du3: self.js2data[du3] for du3 in keys[:int(len(keys)*train_size)]}
+        else:
+            self.data = {du3: self.js2data[du3] for du3 in keys[int(len(keys)*train_size):]}
+        self.keys = list(self.data.keys())
+        print("loaded", len(self.js2data), "used", len(self.data))
+
+    def clear(self):
+        self.js2data.clear()
+
+    def __len__(self):
+        return len(self.keys)
+
+    def __getitem__(self, item):
+        return self.data[self.keys[item]]
+
+class SimDataEvalDebug(Dataset):
+    def __init__(self, root_dir, im_list):
+        print("Loading from", root_dir)
+        super(SimDataEvalDebug, self).__init__()
+        self.root_dir = root_dir
+        identifier = root_dir.split("/")[-1]
+
+        self.scene_jsons = [join(root_dir, f) for f in listdir(root_dir) if isfile(join(root_dir, f)) and f in im_list]
+        print("there are %d files total" % len(self.scene_jsons))
+
+        self.js2data = {}
+        for js in self.scene_jsons:
+            self.js2data[js] = read_seg_masks(js)
+
+        self.data = self.js2data
+        self.keys = list(self.data.keys())
+        print("loaded", len(self.js2data), "used", len(self.data))
+
+    def clear(self):
+        self.js2data.clear()
+
+    def __len__(self):
+        return len(self.keys)
+
+    def __getitem__(self, item):
+        return self.data[self.keys[item]]
+
+
 def construct_weight_map(bbox):
     weight_map = torch.ones(128, 128)
     a_ = 255

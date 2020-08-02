@@ -23,7 +23,7 @@ def eval(model_, iter_, device_="cuda"):
 
         with torch.no_grad():
             loss, start_pred = model_(start, default, weight_maps)
-            pred_sg, blocks = model_.return_sg(start, ob_names)
+            pred_sg = model_.return_sg(start, ob_names)
 
         for i in range(len(graphs)):
             res = sorted(graphs[i]) == sorted(pred_sg[i])
@@ -31,7 +31,6 @@ def eval(model_, iter_, device_="cuda"):
             if res == 0:
                 count_ += 1
                 if count_ <= 50:
-                    print(count_, im_names[i], blocks[i])
                     print(sorted(graphs[i]))
                     print(sorted(pred_sg[i]))
                     print()

@@ -179,7 +179,7 @@ def name2sg(name):
         relationships.append([bottoms[0], "left", bottoms[1]])
     if bottoms[0] != 0 and bottoms[2] != 0 and bottoms[1] == 0:
         relationships.append([bottoms[0], "left", bottoms[2]])
-    return relationships
+    return sorted(relationships)
 
 
 def return_default_mat(im_tensor):
@@ -309,6 +309,7 @@ def read_seg_masks(im_dir="/home/sontung/Downloads/7objs_7k/z.seg346_s1_3420615_
 
 
 def compute_iou(pred, true):
+    nb_objects = pred.size(1)
     pred = torch.sum(pred.view(-1, 3, 128, 128), dim=1)
     true = torch.sum(true.view(-1, 3, 128, 128), dim=1)
     pred[pred.nonzero(as_tuple=True)] = 128
@@ -319,7 +320,11 @@ def compute_iou(pred, true):
         intersect = torch.sum(total[i].flatten()==256).item()
         union = torch.sum(total[i].flatten()==128).item()
         res.append(intersect/(intersect+union)*1.0)
-    return res, np.mean(res)
+    compressed_res = []
+    for j in range(0, len(res), nb_objects):
+        compressed_res.append(np.mean(res[j: j+nb_objects]))
+    assert np.mean(compressed_res) - np.mean(res) <= 0.00001, "%f %f" % (np.mean(compressed_res), np.mean(res))
+    return compressed_res, np.mean(compressed_res)
 
 if __name__ == '__main__':
     import time
