@@ -14,7 +14,7 @@ class LocationBasedGenerator(nn.Module):
         super(LocationBasedGenerator, self).__init__()
 
         # Spatial transformer localization-network
-        resnet = models.resnet34(pretrained=True)
+        resnet = resnet34(pretrained=False)
         layers = list(resnet.children())
 
         # remove the last layer
@@ -192,3 +192,10 @@ class LocationBasedGeneratorCoordConv(nn.Module):
 
 if __name__ == '__main__':
     model = LocationBasedGeneratorCoordConv()
+    model.cuda()
+    import time
+    s = time.time()
+    model.forward(torch.randn((16, 3, 3, 128, 128), device="cuda"),
+                  torch.randn((16, 3, 3, 128, 128), device="cuda"),
+                  torch.randn((16, 3, 1, 128, 128), device="cuda"))
+    print(time.time()-s)

@@ -13,9 +13,9 @@ from torch.utils.tensorboard import SummaryWriter
 
 PARSER = argparse.ArgumentParser()
 PARSER.add_argument("--dir", help="train directory",
-                    default="/scratch/mlr/nguyensg/pbw/blocks-6-3", type=str)
+                    default="/home/sontung/thesis/photorealistic-blocksworld/blocks-5-3", type=str)
 PARSER.add_argument("--eval_dir", help="2nd domain evaluation directory",
-                    default="/scratch/mlr/nguyensg/pbw/blocks-5-3", type=str)
+                    default="/home/sontung/thesis/photorealistic-blocksworld/blocks-6-3-old", type=str)
 PARSER.add_argument("--nb_samples", help="how many samples", default=1000, type=int)
 PARSER.add_argument("--device", help="gpu device", default=0, type=int)
 PARSER.add_argument("--save_data", help="wheather to save processed data", default=1, type=int)
@@ -88,7 +88,6 @@ def train():
             iou = compute_iou(start_pred, start)[1]
             writer.add_scalar('train/loss', loss.item(), idx + epc * len(train_iterator))
             writer.add_scalar('train/iou', iou, idx + epc * len(train_iterator))
-
 
         model.eval()
 

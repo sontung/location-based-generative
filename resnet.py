@@ -64,7 +64,6 @@ class CoordConv(nn.Module):
         if with_r:
             in_size += 1
         self.conv = nn.Conv2d(in_size, out_channels, **kwargs)
-        print(self.state_dict().keys())
 
     def forward(self, x):
         ret = self.addcoords(x)
