@@ -1,7 +1,7 @@
 from torch.utils.data import Dataset, DataLoader
 from data_loader import collate_fn_trans, PBW, pbw_collate_fn
 from torchvision.utils import make_grid
-from models import LocationBasedGenerator
+from models import LocationBasedGeneratorCoordConv
 from utils import compute_grad, show2, compute_iou
 import matplotlib.pyplot as plt
 import numpy as np
@@ -69,7 +69,7 @@ def train():
 
     val_data2 = PBW(train=False, root_dir=EVAL_DIR, train_size=0.0, nb_samples=NB_SAMPLES, if_save_data=SAVE_DATA)
     val_iterator2 = DataLoader(val_data2, batch_size=16, shuffle=False, collate_fn=pbw_collate_fn)
-    model = LocationBasedGenerator()
+    model = LocationBasedGeneratorCoordConv()
     model.to(device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
