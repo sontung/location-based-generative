@@ -162,11 +162,14 @@ def command_by_sg_sg(start_sg, end_sg, ob_names):
     return traces, actions
 
 
-def visualize_plan(im_list, perrow=9):
+def visualize_plan(im_list, perrow=9, if_save=False):
     im_tensors = []
     transform = torchvision.transforms.ToTensor()
-    for im_name in im_list:
-        im_tensors.append(transform(Image.open(im_name).convert('RGB')).unsqueeze(0))
+    for idx, im_name in enumerate(im_list):
+        im = Image.open(im_name).convert('RGB')
+        im_tensors.append(transform(im).unsqueeze(0))
+        if if_save:
+            im.save("figures/%d.png" % idx)
     im_tensors = torch.cat(im_tensors, dim=0)
     show2([im_tensors], "solution", perrow)
 

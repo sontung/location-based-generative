@@ -1,7 +1,7 @@
 from torch.utils.data import Dataset, DataLoader
 from data_loader import collate_fn_trans, PBW, pbw_collate_fn
 from torchvision.utils import make_grid
-from models import RearrangeNetwork, LocationBasedGenerator
+from models import LocationBasedGenerator
 from utils import compute_grad, show2, compute_iou
 import matplotlib.pyplot as plt
 import numpy as np

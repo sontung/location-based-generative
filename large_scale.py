@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 import gc
+import pickle
 from torchvision.datasets import ImageFolder
 from torch.utils.data import Dataset, DataLoader
 from models import LocationBasedGenerator
@@ -161,6 +162,7 @@ if __name__ == '__main__':
             del val_iterator2
             gc.collect()
 
-
-        print(all_wrong)
-        print(np.mean(corr_ious), np.min(corr_ious), np.max(wrong_ious), np.mean(wrong_ious))
+        with open("data/corr.iou", 'wb') as f:
+            pickle.dump(corr_ious, f, pickle.HIGHEST_PROTOCOL)
+        with open("data/wrong.iou", 'wb') as f:
+            pickle.dump(wrong_ious, f, pickle.HIGHEST_PROTOCOL)

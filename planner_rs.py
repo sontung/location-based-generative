@@ -226,6 +226,15 @@ def interpret_action(sg_from, action):
     assert top_block_from != top_block_to
     return [top_block_from, "up", top_block_to]
 
+def pretty_print_actions(seq):
+    print("[", end="")
+    for a in seq:
+        a = a.replace("0", "stack0")
+        a = a.replace("1", "stack1")
+        a = a.replace("2", "stack2")
+        print("\"%s\", " % a, end="")
+    print("]\n")
+
 def plan():
 
     device = "cpu"
@@ -240,8 +249,11 @@ def plan():
     good_list = [join(root_dir, f) for f in listdir(root_dir) if isfile(join(root_dir, f)) and f not in wrong_list]
 
     while True:
-        im_file1 = random.choice(good_list)
-        im_file2 = random.choice(good_list)
+        im_file1 = "/home/sontung/Downloads/6objs_seg/z.seg9958_s1_0432_s2__s0_51.ppm" # random.choice(good_list)
+        im_file2 = "/home/sontung/Downloads/6objs_seg/z.seg15278_s1_203_s2_415_s0_.ppm" # random.choice(good_list)
+
+        # im_file1 = random.choice(good_list)
+        # im_file2 = random.choice(good_list)
 
 
         masks, def_mat, wei_mat, ob_names, sgtrue1, im_names = read_seg_masks(im_file1)
@@ -264,13 +276,22 @@ def plan():
         im_base2 = add_im_bases(im_file2.split("/")[-1])
 
         print(im_file1, im_file2)
-        print(sg1, "\n", sg2)
         sg1.extend(im_base1)
         sg2.extend(im_base2)
 
         # remove left
         sg1 = remove_left_rel(sg1)
         sg2 = remove_left_rel(sg2)
+
+        # override
+        # sg2 = [['blue', 'up', 'red'], ['green', 'up', 'pink'],
+        #         ['pink', 'up', '2']]
+
+        # if ["navy", "up", "0"] not in sg1 and ["navy", "up", "1"] not in sg1 and ["navy", "up", "2"] not in sg1:
+        #     continue
+        print(sg1, "\n", sg2)
+
+
         sg2im = build_sg2im(root_dir, ob_names)
         tr, ac = command_by_sg_sg(sg1, sg2, ob_names)
 
@@ -282,8 +303,8 @@ def plan():
             if action is not None:
                 prev_sg = inv_hash_sg(tr[idx-1], ob_names)
                 act2 = interpret_action(prev_sg, action)
-                readable_actions.append("pick %s and place on top of %s" % (act2[0], act2[2]))
-        print(readable_actions)
+                readable_actions.append("pick %s and place on %s" % (act2[0], act2[2]))
+        pretty_print_actions(readable_actions)
 
         for t in tr:
             try:
@@ -291,7 +312,9 @@ def plan():
             except KeyError:
                 print("failed to visualize, please re run")
                 sys.exit()
-        visualize_plan(image_list)
+        print("last image", image_list[-1])
+        visualize_plan(image_list, if_save=True)
         break
+
 
 plan()

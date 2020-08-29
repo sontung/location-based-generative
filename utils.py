@@ -322,7 +322,7 @@ def compute_iou(pred, true):
         res.append(intersect/(intersect+union)*1.0)
     compressed_res = []
     for j in range(0, len(res), nb_objects):
-        compressed_res.append(np.mean(res[j: j+nb_objects]))
+        compressed_res.append(res[j: j+nb_objects])
     assert np.mean(compressed_res) - np.mean(res) <= 0.00001, "%f %f" % (np.mean(compressed_res), np.mean(res))
     return compressed_res, np.mean(compressed_res)
 
