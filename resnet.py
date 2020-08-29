@@ -69,7 +69,6 @@ class CoordConv(nn.Module):
     def forward(self, x):
         ret = self.addcoords(x)
         ret = self.conv(ret)
-        print("using coordconv")
         return ret
 
 
