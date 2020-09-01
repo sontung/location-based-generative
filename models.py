@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch
 import torchvision
 import torch.nn.functional as F
-from resnet import resnet34
+from resnet import resnet34, CoordConv
 from utils import recon_sg, find_nb_blocks
 from PIL import Image
 
@@ -14,7 +14,9 @@ class LocationBasedGenerator(nn.Module):
         super(LocationBasedGenerator, self).__init__()
 
         # Spatial transformer localization-network
-        resnet = resnet34(pretrained=False)
+        # resnet = resnet34(pretrained=False)
+        resnet = torchvision.models.resnet34(pretrained=True)
+
         layers = list(resnet.children())
 
         # remove the last layer
@@ -71,6 +73,7 @@ class LocationBasedGenerator(nn.Module):
             res.append(sorted(sg))
         return res
 
+
     def forward(self, x, x_default, weights, using_weights=True):
         nb_objects = x.size(1)
 
@@ -104,14 +107,14 @@ class LocationBasedGeneratorCoordConv(nn.Module):
         super(LocationBasedGeneratorCoordConv, self).__init__()
 
         # Spatial transformer localization-network
-        resnet = resnet34(pretrained=False)
+        resnet = torchvision.models.resnet34(pretrained=True)
         layers = list(resnet.children())
 
         # remove the last layer
         layers.pop()
         # remove the first layer as we take a 6-channel input
         layers.pop(0)
-        layers.insert(0, nn.Conv2d(input_channels, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False))
+        layers.insert(0, CoordConv(input_channels, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False))
 
         self.main = nn.Sequential(*layers)
         self.final_layer = nn.Linear(512, output_dim)

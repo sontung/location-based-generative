@@ -1,7 +1,7 @@
 from torch.utils.data import Dataset, DataLoader
 from data_loader import collate_fn_trans, PBW, pbw_collate_fn
 from torchvision.utils import make_grid
-from models import LocationBasedGeneratorCoordConv
+from models import LocationBasedGeneratorCoordConv, LocationBasedGenerator
 from utils import compute_grad, show2, compute_iou
 import matplotlib.pyplot as plt
 import numpy as np
@@ -16,7 +16,7 @@ PARSER.add_argument("--dir", help="train directory",
                     default="/home/sontung/thesis/photorealistic-blocksworld/blocks-5-3", type=str)
 PARSER.add_argument("--eval_dir", help="2nd domain evaluation directory",
                     default="/home/sontung/thesis/photorealistic-blocksworld/blocks-6-3-old", type=str)
-PARSER.add_argument("--nb_samples", help="how many samples", default=1000, type=int)
+PARSER.add_argument("--nb_samples", help="how many samples", default=3000, type=int)
 PARSER.add_argument("--device", help="gpu device", default=0, type=int)
 PARSER.add_argument("--save_data", help="wheather to save processed data", default=1, type=int)
 
@@ -67,7 +67,7 @@ def train():
     train_data = PBW(root_dir=ROOT_DIR, nb_samples=NB_SAMPLES, train_size=1.0)
     train_iterator = DataLoader(train_data, batch_size=8, shuffle=True, collate_fn=pbw_collate_fn)
 
-    val_data2 = PBW(train=False, root_dir=EVAL_DIR, train_size=0.0, nb_samples=NB_SAMPLES, if_save_data=SAVE_DATA)
+    val_data2 = PBW(train=False, root_dir=EVAL_DIR, train_size=0.0, nb_samples=200, if_save_data=SAVE_DATA)
     val_iterator2 = DataLoader(val_data2, batch_size=16, shuffle=False, collate_fn=pbw_collate_fn)
     model = LocationBasedGeneratorCoordConv()
     model.to(device)
