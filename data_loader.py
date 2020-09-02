@@ -128,8 +128,6 @@ class PBWrandom_loc(Dataset):
         identifier = root_dir.split("/")[-1] + "-" + data_id
         self.data_id = data_id
         json_dir = "%s/scene" % root_dir
-        self.scene_jsons = [join(json_dir, f) for f in listdir(json_dir)
-                            if isfile(join(json_dir, f)) and "%s.json" % data_id in f]
 
         self.image_dir = "%s/image" % root_dir
         self.transform = torchvision.transforms.ToTensor()
@@ -140,6 +138,8 @@ class PBWrandom_loc(Dataset):
             with open("data/json2sg-%s" % identifier, 'rb') as f:
                 self.json2sg = pickle.load(f)
         else:
+            self.scene_jsons = [join(json_dir, f) for f in listdir(json_dir)
+                                if isfile(join(json_dir, f)) and "%s.json" % data_id in f]
             self.json2sg = {}
             for js in self.scene_jsons:
                 self.json2sg[js] = read_scene_json(js)
