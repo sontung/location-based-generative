@@ -63,16 +63,7 @@ def roll_masks(masks2_, non_zeros, names):
         res_.append(r_)
     return res_
 
-mypath = "/home/sontung/thesis/photorealistic-blocksworld/blocks-6-3/image"
-onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f))]
 
-data_dict = {}
-for f in onlyfiles:
-    k = f.split("_")[-1]
-    if k not in data_dict:
-        data_dict[k] = [f]
-    else:
-        data_dict[k].append(f)
 
 device = "cuda:1"
 sae = LocationBasedGenerator()
