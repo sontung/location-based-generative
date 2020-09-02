@@ -1,5 +1,5 @@
 import sys
-
+import time
 import torch.nn as nn
 import torch
 import torchvision
@@ -68,13 +68,15 @@ class LocationBasedGenerator(nn.Module):
         trans_vec = theta[:, :, [2, 5]]
         trans_vec[:, :, 0] *= -1
         res = []
+
         for i in range(batch_size):
             sg = recon_sg(ob_names[i], trans_vec[i], nb_blocks_per_img[i])
             res.append(sorted(sg))
+
         return res
 
 
-    def forward(self, x, x_default, weights, using_weights=True):
+    def forward(self, x, x_default, weights, using_weights=True, only_pred=False):
         nb_objects = x.size(1)
 
         # single
@@ -82,6 +84,8 @@ class LocationBasedGenerator(nn.Module):
         x_default = x_default.view(-1, 3, 128, 128)
         weights = weights.view(-1, 128, 128)
         pred = self.infer(x, x_default)
+        if only_pred:
+            return pred
         pos_loss = nn.functional.mse_loss(pred, x[:, :3, :, :], reduction="none")
 
         if using_weights:

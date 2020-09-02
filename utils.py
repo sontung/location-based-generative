@@ -4,6 +4,7 @@ import matplotlib
 matplotlib.use('Agg')
 import numpy as np
 import torchvision
+import time
 import more_itertools
 from torchvision.utils import make_grid
 from PIL import Image
@@ -97,7 +98,6 @@ def recon_sg(obj_names, locations, nb_clusters, if_return_assigns=False):
 
     # decide left relation
     bottoms = sorted(bottoms, key=lambda x: x[2])
-
 
     if len(bottoms) > 1:
         relationships.append([bottoms[0][0], "left", bottoms[1][0]])
