@@ -1,6 +1,3 @@
 [submodule "ccl"]
 	path = ccl
 	url = https://github.com/sontung/ccl
-[submodule "shapestacks"]
-	path = shapestacks
-	url = https://github.com/sontung/shapestacks.git

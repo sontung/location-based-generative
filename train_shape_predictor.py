@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import torchvision.models
-from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 
 from torchvision.transforms import ToPILImage, Compose, Normalize, Resize, ToTensor
