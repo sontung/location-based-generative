@@ -118,6 +118,100 @@ class PBW(Dataset):
     def __getitem__(self, item):
         return self.data[self.keys[item]]
 
+class PBWshape_data(Dataset):
+    def __init__(self, root_dir="/home/sontung/thesis/photorealistic-blocksworld/blocks-4-3-shape1",
+                 train=True, train_size=0.6, nb_samples=1000, json2im=None, if_save_data=True):
+        print("Loading from", root_dir)
+        super(PBWshape_data, self).__init__()
+        self.root_dir = root_dir
+        self.train = train
+        identifier = root_dir.split("/")[-1]
+
+        json_dir = "%s/scene" % root_dir
+        self.scene_jsons = [join(json_dir, f) for f in listdir(json_dir) if isfile(join(json_dir, f))]
+
+        self.image_dir = "%s/image" % root_dir
+        self.transform = torchvision.transforms.ToTensor()
+        self.transform_to_pil = torchvision.transforms.ToPILImage()
+
+        if isfile("data/json2sg-%s" % identifier):
+            print("Loading precomputed json2sg:", "data/json2sg-%s" % identifier)
+            with open("data/json2sg-%s" % identifier, 'rb') as f:
+                self.json2sg = pickle.load(f)
+        else:
+            self.json2sg = {}
+            for js in self.scene_jsons:
+                self.json2sg[js] = read_scene_json(js, return_object_shape=True)
+            if if_save_data:
+                with open("data/json2sg-%s" % identifier, 'wb') as f:
+                    pickle.dump(self.json2sg, f, pickle.HIGHEST_PROTOCOL)
+
+        if json2im is None:
+            self.json2im = self.load_json2im(nb_samples=nb_samples)
+        else:
+            self.json2im = json2im
+
+        keys = list(self.json2im.keys())
+        if train:
+            self.data = {du3: self.json2im[du3] for du3 in keys[:int(len(keys)*train_size)]}
+        else:
+            self.data = {du3: self.json2im[du3] for du3 in keys[int(len(keys)*train_size):]}
+        self.keys = list(self.data.keys())
+        print("loaded", len(self.json2im))
+
+    def load_json2im(self, nb_samples=1000):
+        if nb_samples < 0:
+            nb_samples = len(self.scene_jsons)
+        name = "%s-%d" % (self.root_dir.split("/")[-1], nb_samples)
+        if isfile("data/%s" % name):
+            print("Loading precomputed json2im:", "data/%s" % name)
+            with open("data/%s" % name, 'rb') as f:
+                return pickle.load(f)
+        else:
+            res_dict = {}
+            if nb_samples > 0:
+                random.shuffle(self.scene_jsons)
+            for item in range(len(self.scene_jsons))[:nb_samples]:
+                bboxes, coords, obj_names, img_name, shapes = self.json2sg[self.scene_jsons[item]]
+                sg = recon_sg2(self.scene_jsons[item], if_add_bases=False)
+
+                img_pil = Image.open("%s/%s" % (self.image_dir, img_name)).convert('RGB')
+                img = self.transform(img_pil).unsqueeze(0)
+                all_inp = []
+
+                for bbox in bboxes:
+                    mask_im = torch.zeros_like(img)
+                    default_inp = torch.zeros_like(img)
+
+                    bbox_int = [int(dm11) for dm11 in bbox]
+
+                    # masked the image
+                    for x_ in range(bbox_int[0], bbox_int[2]+1):
+                        idc = range(bbox_int[1], bbox_int[3]+1)
+                        mask_im[:, :, idc, x_] = img[:, :, idc, x_]
+
+                    # place the mask at the origin
+                    idc1 = range(bbox_int[0], bbox_int[2]+1)
+                    idc2 = range(len(idc1))
+                    for j_, y_ in enumerate(range(bbox_int[1], bbox_int[3]+1)):
+                        default_inp[:, :, j_+128-int(-bbox[1]+bbox[3]+1), idc2] = img[:, :, y_, idc1]
+
+                    all_inp.append(mask_im)
+
+                all_inp = torch.cat(all_inp, dim=0).unsqueeze(0)
+
+                res_dict[self.scene_jsons[item]] = (all_inp, shapes, obj_names, sg)
+            with open("data/%s" % name, 'wb') as f:
+                pickle.dump(res_dict, f, pickle.HIGHEST_PROTOCOL)
+            return res_dict
+
+    def __len__(self):
+        return len(self.keys)
+
+    def __getitem__(self, item):
+        return self.data[self.keys[item]]
+
+
 class PBWrandom_loc(Dataset):
     def __init__(self, root_dir="/home/sontung/thesis/photorealistic-blocksworld/blocks-6-3", data_id="0.5",
                  train=True, train_size=0.6, nb_samples=1000, json2im=None, if_save_data=True):
@@ -436,7 +530,7 @@ def read_scene_json2(json_file_dir):
         du = json.load(json_file)
     return du["image_filename"]
 
-def recon_sg2(json_file_dir):
+def recon_sg2(json_file_dir, if_add_bases=True):
     """
     reconstruct a sg from a scene json file
     """
@@ -450,7 +544,8 @@ def recon_sg2(json_file_dir):
         "cyan": [41, 208, 208],
         "yellow": [255, 238, 51],
         "c1": [42, 87, 9],
-        "c2": [255, 102, 255]
+        "c2": [255, 102, 255],
+        "orange": [255, 140, 0]
     }
     color2id = {tuple(v): u for u, v in id2color.items()}
     with open(json_file_dir, 'r') as json_file:
@@ -474,10 +569,13 @@ def recon_sg2(json_file_dir):
             obj["bbox"][3]/128.0,
             ])
     obj2id = {objects[du4]: objects[du4] for du4 in range(len(objects))}
-    relationships = [
-        [obj2id["brown"], "left", obj2id["purple"]],
-        [obj2id["purple"], "left", obj2id["cyan"]],
-    ]
+    if if_add_bases:
+        relationships = [
+            [obj2id["brown"], "left", obj2id["purple"]],
+            [obj2id["purple"], "left", obj2id["cyan"]],
+        ]
+    else:
+        relationships = []
     for du3 in location_dict:
         location = sorted(location_dict[du3], key=lambda x: x[1])
         while len(location) > 1:
@@ -656,7 +754,7 @@ def find_top(up_rel, ob_start):
         if done:
             return ob_start, rel_res
 
-def read_scene_json(json_file_dir, return_top_objects=False):
+def read_scene_json(json_file_dir, return_top_objects=False, return_object_shape=False):
     from random import shuffle
 
     id2color = {
@@ -669,7 +767,8 @@ def read_scene_json(json_file_dir, return_top_objects=False):
         "cyan": [41, 208, 208],
         "yellow": [255, 238, 51],
         "c1": [42, 87, 9],
-        "c2": [255, 102, 255]
+        "c2": [255, 102, 255],
+        "orange": [255, 140, 0]
     }
     color2id = {tuple(v): u for u, v in id2color.items()}
     with open(json_file_dir, 'r') as json_file:
@@ -678,6 +777,7 @@ def read_scene_json(json_file_dir, return_top_objects=False):
     objects = []
     bboxes = []
     locations = []
+    shapes = []
 
     for obj in du["objects"]:
         color = tuple([int(du33*255) for du33 in obj["color"]][:-1])
@@ -695,16 +795,21 @@ def read_scene_json(json_file_dir, return_top_objects=False):
             obj["bbox"][3],
         ])
         locations.append([obj["location"][0], obj["location"][2]])
+        shapes.append(obj["shape"])
     sg = recon_sg(objects, locations)
 
-    up_rel = [rel for rel in sg if rel[1] == "up"]
-    values_for_masks = [dm1+1 for dm1 in list(range(len(objects)))]
-    shuffle(values_for_masks)
-    obID2mask_value = {objects[dm3]: values_for_masks[dm3] for dm3 in range(len(objects))}
-    ob_mask_value = [obID2mask_value[dm4] for dm4 in objects]
-    top_obj_ids = [obID2mask_value[find_top(up_rel, du)[0]]-1 for du in ["brown", "purple", "cyan"]]
+
     if return_top_objects:
+        up_rel = [rel for rel in sg if rel[1] == "up"]
+        values_for_masks = [dm1 + 1 for dm1 in list(range(len(objects)))]
+        shuffle(values_for_masks)
+        obID2mask_value = {objects[dm3]: values_for_masks[dm3] for dm3 in range(len(objects))}
+        ob_mask_value = [obID2mask_value[dm4] for dm4 in objects]
+        top_obj_ids = [obID2mask_value[find_top(up_rel, du)[0]] - 1 for du in ["brown", "purple", "cyan"]]
         return bboxes, locations, objects, du["image_filename"], ob_mask_value, top_obj_ids
+    if return_object_shape:
+        return bboxes, locations, objects, du["image_filename"], shapes
+
     return bboxes, locations, objects, du["image_filename"]
 
 def kmeans(data_):
