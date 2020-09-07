@@ -10,6 +10,7 @@ import sys
 from utils import read_seg_masks
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
+from torchvision.transforms import Compose, Normalize, Resize, ToTensor
 
 from os import listdir
 from os.path import isfile, join
@@ -211,6 +212,33 @@ class PBWshape_data(Dataset):
     def __getitem__(self, item):
         return self.data[self.keys[item]]
 
+class PBWstability_data(Dataset):
+    def __init__(self, root_dir="/home/sontung/thesis/location-based-generative/data/stability",
+                 train=True, train_size=0.6):
+        print("Loading from", root_dir)
+        super(PBWstability_data, self).__init__()
+        self.root_dir = root_dir
+        self.train = train
+        image_files = [join(root_dir, f) for f in listdir(root_dir) if isfile(join(root_dir, f))]
+        if train:
+            image_files = image_files[:int(len(image_files)*train_size)]
+        else:
+            image_files = image_files[int(len(image_files)*train_size):]
+
+        trans_ = Compose([
+            Resize((224, 224)),
+            ToTensor(),
+            Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        ])
+
+        self.image_arr = [trans_(Image.open(f).convert('RGB')) for f in image_files]
+        self.target_arr = [int(f.split(".png")[0][-1]) for f in image_files]
+
+    def __len__(self):
+        return len(self.image_arr)
+
+    def __getitem__(self, item):
+        return self.image_arr[item], self.target_arr[item]
 
 class PBWrandom_loc(Dataset):
     def __init__(self, root_dir="/home/sontung/thesis/photorealistic-blocksworld/blocks-6-3", data_id="0.5",
