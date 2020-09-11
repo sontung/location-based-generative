@@ -22,6 +22,7 @@ PARSER.add_argument("--eval_dir", help="2nd domain evaluation directory",
 PARSER.add_argument("--nb_samples", help="how many samples", default=3000, type=int)
 PARSER.add_argument("--device", help="gpu device", default=0, type=int)
 PARSER.add_argument("--save_data", help="wheather to save processed data", default=1, type=int)
+PARSER.add_argument("--replacing", help="wheather to replace with mask", default=1, type=int)
 
 MY_ARGS = PARSER.parse_args()
 
@@ -30,6 +31,7 @@ ROOT_DIR = MY_ARGS.dir
 EVAL_DIR = MY_ARGS.eval_dir
 DEVICE = "cuda:%d" % MY_ARGS.device
 SAVE_DATA = MY_ARGS.save_data == 1
+REPLACING = MY_ARGS.replacing == 1
 
 
 def eval_f(model_, iter_, name_="1", device_="cuda"):
@@ -40,7 +42,8 @@ def eval_f(model_, iter_, name_="1", device_="cuda"):
     for idx, train_batch in enumerate(iter_):
         start, coord_true, default, weight_maps = [tensor.to(device_) for tensor in train_batch[:4]]
         graphs, ob_names = train_batch[4:]
-        start, default = replacing_obj(start, default)
+        if REPLACING:
+            start, default = replacing_obj(start, default)
 
         with torch.no_grad():
             loss, start_pred = model_(start, default, weight_maps)
@@ -107,7 +110,8 @@ def train():
         for idx, train_batch in enumerate(train_iterator):
             optimizer.zero_grad()
             start, coord_true, default, weight_maps = [tensor.to(device) for tensor in train_batch[:4]]
-            start, default = replacing_obj(start, default)
+            if REPLACING:
+                start, default = replacing_obj(start, default)
             loss, start_pred = model(start, default, weight_maps)
             loss.backward()
 
