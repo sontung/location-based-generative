@@ -345,12 +345,13 @@ class PBWrandom_loc(Dataset):
 
 class PBW_Planning_only(Dataset):
     def __init__(self, root_dir="/home/sontung/thesis/photorealistic-blocksworld/blocks-6-3",
-                 train=True, train_size=0.6, nb_samples=1000, json2im=None):
+                 train=True, train_size=0.6, nb_samples=1000, json2im=None, base=True):
         print("Loading from", root_dir)
         super(PBW_Planning_only, self).__init__()
         self.root_dir = root_dir
         self.train = train
-        identifier = root_dir.split("/")[-1]
+        self.base = base
+        identifier = root_dir.split("/")[-1]+"planning_only"
 
         json_dir = "%s/scene" % root_dir
         self.scene_jsons = [join(json_dir, f) for f in listdir(json_dir) if isfile(join(json_dir, f))]
@@ -395,7 +396,7 @@ class PBW_Planning_only(Dataset):
             res_dict = {}
             for item in range(len(self.scene_jsons))[:nb_samples]:
                 bboxes, coords, obj_names, img_name = self.json2sg[self.scene_jsons[item]]
-                sg = recon_sg2(self.scene_jsons[item])
+                sg = recon_sg2(self.scene_jsons[item], if_add_bases=self.base)
 
                 img_pil = Image.open("%s/%s" % (self.image_dir, img_name)).convert('RGB')
                 img = self.transform(img_pil).unsqueeze(0)
@@ -575,6 +576,7 @@ def recon_sg2(json_file_dir, if_add_bases=True):
         "c2": [255, 102, 255],
         "orange": [255, 140, 0]
     }
+
     color2id = {tuple(v): u for u, v in id2color.items()}
     with open(json_file_dir, 'r') as json_file:
         du = json.load(json_file)
@@ -613,6 +615,7 @@ def recon_sg2(json_file_dir, if_add_bases=True):
             assert o1 not in ["cyan", "purple", "brown"]
 
     return relationships
+
 
 def recon_sg(obj_names, locations, if_return_assigns=False):
     """

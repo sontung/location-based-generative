@@ -162,7 +162,7 @@ def command_by_sg_sg(start_sg, end_sg, ob_names):
     return traces, actions
 
 
-def visualize_plan(im_list, perrow=9, if_save=False):
+def visualize_plan(im_list, perrow=9, if_save=False, name="solution"):
     im_tensors = []
     transform = torchvision.transforms.ToTensor()
     for idx, im_name in enumerate(im_list):
@@ -171,13 +171,14 @@ def visualize_plan(im_list, perrow=9, if_save=False):
         if if_save:
             im.save("figures/%d.png" % idx)
     im_tensors = torch.cat(im_tensors, dim=0)
-    show2([im_tensors], "solution", perrow)
+    show2([im_tensors], name, perrow)
 
 
 def command_by_im_im(model_, device="cuda", name="blocks-5-3-2520-planning", domain_task="blocks-5-3",
                      nb_objects=8):
     _ = PBW_Planning_only(root_dir="/home/sontung/thesis/photorealistic-blocksworld/%s" % domain_task, nb_samples=-1)
-    ob_names = ['brown', 'purple', 'cyan', 'gray', 'blue', 'red', 'green', 'yellow'][:nb_objects]
+    # ob_names = ['brown', 'purple', 'cyan', 'gray', 'blue', 'red', 'green', 'yellow'][:nb_objects]
+    ob_names = ['brown', 'purple', 'cyan', 'gray', 'blue', 'yellow', 'green', 'c2']
     ob_names = [ob_names, ob_names]
     print("Loading precomputed json2im:", "data/%s" % name)
     with open("data/%s" % name, 'rb') as f:
@@ -198,6 +199,7 @@ def command_by_im_im(model_, device="cuda", name="blocks-5-3-2520-planning", dom
         end = js2mask[after_name][0].to(device)
         ob_names2 = js2mask[after_name][-1]
 
+        print(ob_names1, ob_names2, ob_names[0])
         assert ob_names1 == ob_names2 == ob_names[0]
 
         print("planning from %s to %s" % (before_name.split("/")[-1], after_name.split("/")[-1]))
