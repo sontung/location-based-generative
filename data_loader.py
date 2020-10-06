@@ -426,6 +426,276 @@ class PBW_Planning_only(Dataset):
     def __getitem__(self, item):
         return self.data[self.keys[item]]
 
+class PBW_3D(Dataset):
+    def __init__(self, root_dir="/home/sontung/thesis/photorealistic-blocksworld/blocks-4-3",
+                 train=True, train_size=0.6, nb_samples=-1, json2im=None, base=True):
+        print("Loading from", root_dir)
+        super(PBW_3D, self).__init__()
+        self.root_dir = root_dir
+        self.train = train
+        self.base = base
+        identifier = root_dir.split("/")[-1]+"3d_rel"
+        self.identifier = identifier
+
+        json_dir = "%s/scene" % root_dir
+        self.scene_jsons = [join(json_dir, f) for f in listdir(json_dir)
+                            if isfile(join(json_dir, f)) and "cam" not in f]
+
+        self.image_dir = "%s/image" % root_dir
+        self.transform = torchvision.transforms.ToTensor()
+        self.transform_to_pil = torchvision.transforms.ToPILImage()
+
+        if isfile("data/json2sg-%s" % identifier):
+            print("Loading precomputed json2sg:", "data/json2sg-%s" % identifier)
+            with open("data/json2sg-%s" % identifier, 'rb') as f:
+                self.json2sg = pickle.load(f)
+        else:
+            self.json2sg = {}
+            for js in self.scene_jsons:
+                self.json2sg[js] = self.read_scene_json(js)
+            with open("data/json2sg-%s" % identifier, 'wb') as f:
+                pickle.dump(self.json2sg, f, pickle.HIGHEST_PROTOCOL)
+
+        if json2im is None:
+            self.json2im = self.load_json2im(nb_samples=nb_samples)
+        else:
+            self.json2im = json2im
+
+        keys = list(self.json2im.keys())
+        if train:
+            self.data = {du3: self.json2im[du3] for du3 in keys[:int(len(keys)*train_size)]}
+        else:
+            self.data = {du3: self.json2im[du3] for du3 in keys[int(len(keys)*train_size):]}
+        self.keys = list(self.data.keys())
+        print("loaded", len(self.json2im))
+
+    def load_json2im(self, nb_samples=1000):
+        if nb_samples < 0:
+            nb_samples = len(self.scene_jsons)
+        name = "%s-%d-%s" % (self.root_dir.split("/")[-1], nb_samples, self.identifier)
+        if isfile("data/%s" % name):
+            print("Loading precomputed json2im:", "data/%s" % name)
+            with open("data/%s" % name, 'rb') as f:
+                return pickle.load(f)
+        else:
+            res_dict = {}
+            sg2behind = {}
+            for item in range(len(self.scene_jsons))[:nb_samples]:
+                bboxes, coords, obj_names, img_name = self.json2sg[self.scene_jsons[item]]
+
+                sg, sh_hash, front_objects, behind_objects, base_dict = self.recon_sg(coords, obj_names)
+
+                if len(front_objects) == 0:
+                    continue
+
+                sg_n1 = []
+                sg_n2 = []
+                for i_ in range(len(front_objects)-1):
+                    sg_n1.append([front_objects[i_], "up", front_objects[i_+1]])
+                    sg_n2.append([front_objects[i_], "up", front_objects[i_+1]])
+                for rel in sg:
+                    if rel[0] not in front_objects and rel[2] not in front_objects:
+                        sg_n1.append(rel)
+                        sg_n2.append(rel)
+
+                sg_n1.append([front_objects[-1], "up", "00"])
+                if "10" in base_dict:
+                    sg_n1.append([front_objects[-1], "front", base_dict["10"]])
+                sg_n2.append([front_objects[-1], "up", "02"])
+                if "12" in base_dict:
+                    sg_n2.append([front_objects[-1], "front", base_dict["12"]])
+
+
+                img_pil = Image.open("%s/%s" % (self.image_dir, img_name)).convert('RGB')
+                img = self.transform(img_pil).unsqueeze(0)
+                front_masks = []
+                behind_masks = []
+                for i_, bbox in enumerate(bboxes):
+                    mask_im = torch.zeros_like(img)
+                    bbox_int = [int(dm11) for dm11 in bbox]
+
+                    # masked the image
+                    for x_ in range(bbox_int[0], bbox_int[2]+1):
+                        idc = range(bbox_int[1], bbox_int[3]+1)
+                        mask_im[:, :, idc, x_] = img[:, :, idc, x_]
+
+                    if coords[i_][1] == -2:
+                        front_masks.append(mask_im)
+                    elif coords[i_][1] == 2:
+                        behind_masks.append(mask_im)
+
+                if front_masks:
+                    front_masks = torch.cat(front_masks, dim=0).unsqueeze(0)  # masks
+                else:
+                    front_masks = []
+
+                if behind_masks:
+                    behind_masks = torch.cat(behind_masks, dim=0).unsqueeze(0)  # masks
+                else:
+                    behind_masks = []
+
+                assert sh_hash not in sg2behind, "sg hash code not unique"
+                sg2behind[sh_hash] = (behind_masks, img_name)
+
+                res_dict[self.scene_jsons[item]] = (sg, obj_names, front_masks, behind_masks, behind_objects, sg_n1, sg_n2,
+                                                    img_name)
+            res_dict["sg2behind"] = sg2behind
+
+            for k in res_dict.keys():
+                print(res_dict[k][-1])
+                print(res_dict[k][-4])
+                n1 = res_dict[k][-2]
+                n2 = res_dict[k][-3]
+                print(res_dict[k][0])
+                print(n1)
+                print(n2)
+                print(sg2behind[self.hash_sg(n1)][1])
+                print(sg2behind[self.hash_sg(n2)][1])
+
+                sys.exit()
+            # with open("data/%s" % name, 'wb') as f:
+            #     pickle.dump(res_dict, f, pickle.HIGHEST_PROTOCOL)
+            return res_dict
+
+    def recon_sg(self, loc_, name_):
+        front_ = []
+        behind_ = []
+        name2loc = {n: loc_[i_] for i_, n in enumerate(name_)}
+        bases = {"0": "1", "-3": "0", "3": "2"}
+        base_sg = []
+        front_objects = []
+        behind_objects = []
+
+        base_dict_all = {}
+        for i_, n in enumerate(name_):
+            if loc_[i_][1] == -2:
+                base_sg.append([n, "up", "0"+bases[str(int(loc_[i_][0]))]])
+                front_.append(n)
+                front_objects.append(n)
+                base_dict_all[n] = "0" + bases[str(int(loc_[i_][0]))]
+            elif loc_[i_][1] == 2:
+                base_sg.append([n, "up", "1"+bases[str(int(loc_[i_][0]))]])
+                behind_.append(n)
+                behind_objects.append(n)
+                base_dict_all[n] = "1" + bases[str(int(loc_[i_][0]))]
+
+        for obj in behind_objects[:]:
+            if base_dict_all[obj][0] == "1":
+                front_base = "0"+base_dict_all[obj][1]
+                if front_base in base_dict_all.values():
+                    behind_objects.remove(obj)
+
+        behind_sg = []
+        front_sg = []
+        if len(front_) > 0:
+            front_sg = recon_sg(front_, [(name2loc[n][0], name2loc[n][2]) for n in front_], if_add_bases=False)
+        if len(behind_) > 0:
+            behind_sg = recon_sg(behind_, [(name2loc[n][0], name2loc[n][2]) for n in behind_], if_add_bases=False)
+
+        base_dict = {}
+        for rel in base_sg[:]:
+            if rel[0] in [du[0] for du in (front_sg+behind_sg)]:
+                base_sg.remove(rel)
+        for rel in base_sg:
+            assert rel[2] not in base_dict
+            base_dict[rel[2]] = rel[0]
+
+        total_sg = front_sg+behind_sg+base_sg
+
+        line = {du1: [] for du1 in ["00", "01", "02", "10", "11", "12"]}
+        for rel in total_sg:
+            if rel[2] in ["00", "01", "02", "10", "11", "12"]:
+                line[rel[2]].append(rel[0])
+
+        threed_sg = []
+        for base in base_dict:
+           if base[0] == "0":
+               if str(int(base)+10) in base_dict:
+                   threed_sg.append([base_dict[base], "front", base_dict[str(int(base)+10)]])
+
+        total_sg = front_sg+behind_sg+base_sg+threed_sg
+        return total_sg, self.hash_sg(total_sg), front_objects, behind_objects, base_dict
+
+    def read_scene_json(self, json_file_dir):
+
+        id2color = {
+            "gray": [87, 87, 87],
+            "red": [173, 35, 35],
+            "blue": [42, 75, 215],
+            "green": [29, 105, 20],
+            "brown": [129, 74, 25],
+            "purple": [129, 38, 192],
+            "cyan": [41, 208, 208],
+            "yellow": [255, 238, 51],
+            "c1": [42, 87, 9],
+            "c2": [255, 102, 255],
+            "orange": [255, 140, 0]
+        }
+        color2id = {tuple(v): u for u, v in id2color.items()}
+        with open(json_file_dir, 'r') as json_file:
+            du = json.load(json_file)
+        location_dict = {}
+        objects = []
+        bboxes = []
+        locations = []
+        shapes = []
+
+        for obj in du["objects"]:
+            color = tuple([int(du33 * 255) for du33 in obj["color"]][:-1])
+            object_id = color2id[color]
+            a_key = "%.3f" % obj["location"][0]
+            if a_key not in location_dict:
+                location_dict[a_key] = [(object_id, obj["location"][2])]
+            else:
+                location_dict[a_key].append((object_id, obj["location"][2]))
+            objects.append(object_id)
+            bboxes.append([
+                obj["bbox"][0],
+                obj["bbox"][1],
+                obj["bbox"][2],
+                obj["bbox"][3],
+            ])
+            locations.append([obj["location"][0], obj["location"][1], obj["location"][2]])
+            shapes.append(obj["shape"])
+
+        return bboxes, locations, objects, du["image_filename"]
+
+    def hash_sg(self, relationships,
+                ob_names=('brown', 'purple', 'cyan', 'blue', 'red', 'green', 'gray',
+                          "00", "01", "02", "10", "11", "12")):
+        """
+        hash into unique ID
+        :param relationships: [['brown', 'left', 'purple'] , ['yellow', 'up', 'yellow']]
+        :param ob_names:
+        :return:
+        """
+
+        for rel in relationships:
+            assert rel[0] in ob_names and rel[2] in ob_names
+
+        a_key = [0] * len(ob_names) * len(ob_names)
+        pred2id = {"none": 0, "left": 1, "up": 2, "front": 3}
+        predefined_objects1 = ob_names[:]
+        predefined_objects2 = ob_names[:]
+        pair2pred = {}
+        for rel in relationships:
+            if rel[1] != "__in_image__":
+                pair2pred[(rel[0], rel[2])] = pred2id[rel[1]]
+
+        idx = 0
+        for ob1 in predefined_objects1:
+            for ob2 in predefined_objects2:
+                if (ob1, ob2) in pair2pred:
+                    a_key[idx] = pair2pred[(ob1, ob2)]
+                idx += 1
+        return tuple(a_key)
+
+    def __len__(self):
+        return len(self.keys)
+
+    def __getitem__(self, item):
+        return self.data[self.keys[item]]
+
 class SimData(Dataset):
     def __init__(self, root_dir="/home/sontung/Downloads/5objs_seg", nb_samples=10,
                  train=True, train_size=0.6, if_save_data=True):
@@ -617,7 +887,7 @@ def recon_sg2(json_file_dir, if_add_bases=True):
     return relationships
 
 
-def recon_sg(obj_names, locations, if_return_assigns=False):
+def recon_sg(obj_names, locations, if_return_assigns=False, if_add_bases=True):
     """
     reconstruct a sg from object names and coordinates
     """
@@ -639,10 +909,12 @@ def recon_sg(obj_names, locations, if_return_assigns=False):
         else:
             location_dict[a_key].append((object_id, locations[idx][1]))
         objects.append(object_id)
-    relationships = [
-        ["brown", "left", "purple"],
-        ["purple", "left", "cyan"],
-    ]
+    relationships = []
+    if if_add_bases:
+        relationships.extend([
+            ["brown", "left", "purple"],
+            ["purple", "left", "cyan"],
+        ])
     for du3 in location_dict:
         location = sorted(location_dict[du3], key=lambda x: x[1])
         while len(location) > 1:
@@ -827,10 +1099,10 @@ def read_scene_json(json_file_dir, return_top_objects=False, return_object_shape
         ])
         locations.append([obj["location"][0], obj["location"][2]])
         shapes.append(obj["shape"])
-    sg = recon_sg(objects, locations)
 
 
     if return_top_objects:
+        sg = recon_sg(objects, locations)
         up_rel = [rel for rel in sg if rel[1] == "up"]
         values_for_masks = [dm1 + 1 for dm1 in list(range(len(objects)))]
         shuffle(values_for_masks)
@@ -865,4 +1137,4 @@ def kmeans(data_):
 
 
 if __name__ == '__main__':
-    d = SimData()
+    d = PBW_3D()
