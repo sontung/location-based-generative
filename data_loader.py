@@ -510,6 +510,8 @@ class PBW_3D(Dataset):
                 img = self.transform(img_pil).unsqueeze(0)
                 front_masks = []
                 behind_masks = []
+                front_masks_name = []
+                behind_masks_name = []
                 for i_, bbox in enumerate(bboxes):
                     mask_im = torch.zeros_like(img)
                     bbox_int = [int(dm11) for dm11 in bbox]
@@ -521,8 +523,11 @@ class PBW_3D(Dataset):
 
                     if coords[i_][1] == -2:
                         front_masks.append(mask_im)
-                    elif coords[i_][1] == 2:
+                        front_masks_name.append(obj_names[i_])
+                    elif coords[i_][1] == 2 and obj_names[i_] in behind_objects:
                         behind_masks.append(mask_im)
+                        behind_masks_name.append(obj_names[i_])
+
 
                 if front_masks:
                     front_masks = torch.cat(front_masks, dim=0).unsqueeze(0)  # masks
@@ -538,21 +543,21 @@ class PBW_3D(Dataset):
                 sg2behind[sh_hash] = (behind_masks, img_name)
 
                 res_dict[self.scene_jsons[item]] = (sg, obj_names, front_masks, behind_masks, behind_objects, sg_n1, sg_n2,
-                                                    img_name)
+                                                    img_name, front_masks_name, behind_masks_name)
             res_dict["sg2behind"] = sg2behind
 
-            for k in res_dict.keys():
-                print(res_dict[k][-1])
-                print(res_dict[k][-4])
-                n1 = res_dict[k][-2]
-                n2 = res_dict[k][-3]
-                print(res_dict[k][0])
-                print(n1)
-                print(n2)
-                print(sg2behind[self.hash_sg(n1)][1])
-                print(sg2behind[self.hash_sg(n2)][1])
-
-                sys.exit()
+            # for k in list(res_dict.keys())[100:]:
+            #     print(res_dict[k][-1])
+            #     print(res_dict[k][-4])
+            #     n1 = res_dict[k][-2]
+            #     n2 = res_dict[k][-3]
+            #     print(res_dict[k][0])
+            #     print(n1)
+            #     print(n2)
+            #     print(sg2behind[self.hash_sg(n1)][1])
+            #     print(sg2behind[self.hash_sg(n2)][1])
+            #
+            #     sys.exit()
             # with open("data/%s" % name, 'wb') as f:
             #     pickle.dump(res_dict, f, pickle.HIGHEST_PROTOCOL)
             return res_dict

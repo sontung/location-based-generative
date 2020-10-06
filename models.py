@@ -44,7 +44,11 @@ class LocationBasedGenerator(nn.Module):
 
     def find_theta(self, x):
         xs = self.main(x)
-        trans_vec = self.final_layer(xs.squeeze())
+        if xs.size(0) == 1:
+            xs = xs.squeeze().unsqueeze(0)
+        else:
+            xs = xs.squeeze()
+        trans_vec = self.final_layer(xs)
         trans_vec = torch.sigmoid(trans_vec)
         theta = torch.tensor([1, 0, -1.6, 0, 1, 1.6], dtype=torch.float, requires_grad=True).repeat(x.size(0), 1).to(x.device)
         theta[:, 2] = -trans_vec[:, 0]*1.6

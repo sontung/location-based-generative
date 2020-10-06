@@ -69,7 +69,7 @@ def train():
 
     val_data2 = PBW(train=False, root_dir=EVAL_DIR, train_size=0.0, nb_samples=200, if_save_data=SAVE_DATA)
     val_iterator2 = DataLoader(val_data2, batch_size=16, shuffle=False, collate_fn=pbw_collate_fn)
-    model = LocationBasedGeneratorCoordConv()
+    model = LocationBasedGenerator()
     model.to(device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
@@ -82,6 +82,7 @@ def train():
             start, coord_true, default, weight_maps = [tensor.to(device) for tensor in train_batch[:4]]
 
             loss, start_pred = model(start, default, weight_maps)
+            print(start.size())
             loss.backward()
 
             optimizer.step()
