@@ -60,7 +60,7 @@ class LocationBasedGenerator(nn.Module):
         x_pred = self.transform(x_default, theta)
         return x_pred
 
-    def return_sg(self, x, ob_names):
+    def return_sg(self, x, ob_names, if_return_trans_vec=False):
         """
         x: masks, (bs, nb masks, 3, 128, 128)
         ob_names: name for each mask
@@ -80,6 +80,9 @@ class LocationBasedGenerator(nn.Module):
         for i in range(batch_size):
             sg = recon_sg(ob_names[i], trans_vec[i], nb_blocks_per_img[i])
             res.append(sorted(sg))
+
+        if if_return_trans_vec:
+            return res, trans_vec
 
         return res
 

@@ -540,7 +540,7 @@ class PBW_3D(Dataset):
                     behind_masks = []
 
                 assert sh_hash not in sg2behind, "sg hash code not unique"
-                sg2behind[sh_hash] = (behind_masks, img_name)
+                sg2behind[sh_hash] = (behind_masks, behind_objects, img_name)
 
                 res_dict[self.scene_jsons[item]] = (sg, obj_names, front_masks, behind_masks, behind_objects, sg_n1, sg_n2,
                                                     img_name, front_masks_name, behind_masks_name)
@@ -558,8 +558,8 @@ class PBW_3D(Dataset):
             #     print(sg2behind[self.hash_sg(n2)][1])
             #
             #     sys.exit()
-            # with open("data/%s" % name, 'wb') as f:
-            #     pickle.dump(res_dict, f, pickle.HIGHEST_PROTOCOL)
+            with open("data/%s" % name, 'wb') as f:
+                pickle.dump(res_dict, f, pickle.HIGHEST_PROTOCOL)
             return res_dict
 
     def recon_sg(self, loc_, name_):
