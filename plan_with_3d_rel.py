@@ -1,13 +1,10 @@
 from data_loader import PBW_3D
 from models import LocationBasedGenerator
-from utils import kmeans
 import torch
-import sys
 device = "cuda:0"
 
 test_data = PBW_3D()
 sg2behind = test_data.json2im["sg2behind"]
-print(len(sg2behind))
 
 model = LocationBasedGenerator()
 model.to(device)
@@ -61,9 +58,12 @@ for test_sample in test_data:
             pred_all.append(pred)
 
     no_base_true = []
+    base_true = []
     for rel in sg:
         if "0" not in rel[2] and "1" not in rel[2] and rel[1] != "left":
             no_base_true.append(rel)
+        else:
+            base_true.append(rel)
 
     # add front rel
     all_name = front_masks_name + b_names1 + b_names2
@@ -79,27 +79,47 @@ for test_sample in test_data:
         if rel[1] == "left":
             pred_all.remove(rel)
 
-    all_trans_vec = torch.cat(trans, dim=1).squeeze()
-    assigns = kmeans(all_trans_vec[:, 1], 3)
-    name2assign = {all_name[du]: assigns[du] for du in range(len(all_name))}
+    ob2base = {}
+    base2ob = {g: [] for g in ["10", "11", "12"]}
+    middle_obj = []
+    for ob in b_names1:
+        if ob in b_names2:
+            middle_obj.append(ob)
+            ob2base[ob] = "11"
+            base2ob["11"].append(ob)
+    right_obj = []
+    for ob in b_names1:
+        if ob not in b_names2:
+            right_obj.append(ob)
+            ob2base[ob] = "12"
+            base2ob["12"].append(ob)
+    left_obj = []
+    for ob in b_names2:
+        if ob not in b_names1:
+            left_obj.append(ob)
+            ob2base[ob] = "10"
+            base2ob["10"].append(ob)
 
-    for f_name in front_masks_name:
-        for b_name in all_b_names:
-            if name2assign[f_name] == name2assign[b_name]:
-                pred_all.append([f_name, "front", b_name])
+    base2ob_front = {rel[2]: rel[0] for rel in base_true}
+    for base in base2ob:
+        if len(base2ob[base]) > 0:
+            b2 = "0"+base[1]
+            if b2 in base2ob_front:
+                res = None
+                for b1 in base2ob[base]:
+                    res = b1
+                    for p in pred_all:
+                        if b1 == p[0] and p[1] == "up":
+                            res = None
+                            break
+                    if res is not None:
+                        break
+                assert res is not None
+                pred_all.append([base2ob_front[b2], "front", res])
+
 
     if test_data.hash_sg(no_base_true) == test_data.hash_sg(pred_all):
         acc2 += 1
-    else:
-        print(sorted(no_base_true))
-        print(sorted(pred_all))
-        print(front_masks_name, b_names1, b_names2)
-        # all_trans_vec = torch.cat(trans, dim=1).squeeze()
-        # print(all_trans_vec)
-        # print(kmeans(all_trans_vec[:, 0], 3))
-        # print(kmeans(all_trans_vec[:, 1], 3))
-        #
-        sys.exit()
 
     acc += 1
     total += 1
