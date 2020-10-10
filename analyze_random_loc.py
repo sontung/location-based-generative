@@ -49,7 +49,7 @@ def find_cc(start_):
     result, idx_set = ccl.connected_component_labelling(bool_image, 8)
     return result, idx_set
 
-def roll_masks(masks2_, non_zeros, names):
+def roll_masks(masks2_, non_zeros, names, vis=True):
     masks_ = masks2_.clone()
     possible_shifts = [0, -5, 5, -10, 10, -15, 15]
     rolled_masks = {sh: [] for sh in possible_shifts}
@@ -58,14 +58,27 @@ def roll_masks(masks2_, non_zeros, names):
         if first_ in non_zeros:
             for sh in possible_shifts:
                 rolled_masks[sh].append([torch.roll(masks_[id_], shifts=sh, dims=2), names[id_]])
+
     res_ = []
     for r_ in rolled_masks.values():
         res_.append(r_)
+    # print(res_)
+    if vis:
+        from utils import show2
+        print(masks2_.size())
+        for id_, r_ in enumerate(res_):
+            list_ = torch.stack([du[0].unsqueeze(0) for du in r_], dim=0)
+            print(torch.sum(list_, dim=0).size())
+            show2([
+                torch.sum(masks2_, dim=0).cpu(),
+                torch.sum(list_, dim=0).cpu(),
+            ], "figures/test%s.png" % id_, 2)
+        sys.exit()
     return res_
 
 
 
-device = "cuda:1"
+device = "cuda:0"
 sae = LocationBasedGenerator()
 sae.to(device)
 sae.load_state_dict(torch.load("pre_models/model-20200726-041935", map_location=device))

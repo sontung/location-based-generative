@@ -457,7 +457,7 @@ class PBW_3D(Dataset):
                 pickle.dump(self.json2sg, f, pickle.HIGHEST_PROTOCOL)
 
         if json2im is None:
-            self.json2im = self.load_json2im(nb_samples=nb_samples)
+            self.json2im = self.load_json2im(nb_samples)
         else:
             self.json2im = json2im
 
@@ -469,7 +469,7 @@ class PBW_3D(Dataset):
         self.keys = list(self.data.keys())
         print("loaded", len(self.json2im))
 
-    def load_json2im(self, nb_samples=1000):
+    def load_json2im(self, nb_samples):
         if nb_samples < 0:
             nb_samples = len(self.scene_jsons)
         name = "%s-%d-%s" % (self.root_dir.split("/")[-1], nb_samples, self.identifier)
@@ -486,6 +486,7 @@ class PBW_3D(Dataset):
                 sg, sh_hash, front_objects, behind_objects, base_dict = self.recon_sg(coords, obj_names)
 
                 if len(front_objects) == 0:
+                    sg2behind[sh_hash] = (None, None, img_name)
                     continue
 
                 sg_n1 = []
@@ -561,6 +562,7 @@ class PBW_3D(Dataset):
             with open("data/%s" % name, 'wb') as f:
                 pickle.dump(res_dict, f, pickle.HIGHEST_PROTOCOL)
             return res_dict
+
 
     def recon_sg(self, loc_, name_):
         front_ = []
