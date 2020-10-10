@@ -56,6 +56,7 @@ def show2(im_, name, nrow):
     plt.axis("off")
     # plt.title("black: no action, red: 1-3, yellow: 3-1, green: 1-2, blue: 2-3, pink: 3-2, brown: 2-1")
     plt.savefig(name, transparent=True, bbox_inches='tight')
+    print("saved to", name)
     plt.close(fig_)
     logger.setLevel(old_level)
 

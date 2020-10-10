@@ -676,7 +676,6 @@ class PBW_3D(Dataset):
         :param ob_names:
         :return:
         """
-
         for rel in relationships:
             assert rel[0] in ob_names and rel[2] in ob_names
 

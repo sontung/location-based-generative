@@ -1,8 +1,10 @@
 from data_loader import PBW_3D
 from models import LocationBasedGenerator
-from planner import find_top
+from planner import find_top, visualize_plan
+import queue
 import torch
 import sys
+import random
 device = "cuda:0"
 
 def test_sg_pred():
@@ -163,26 +165,60 @@ def action_model(sg_from):
                         if front_base in present_bases:
                             front_obj = find_closest(up_rel, front_base)
                             sg_neighbor.append([front_obj, "front", o1])
-                neighboring_sg.append([sg_neighbor, (b1, b2, o1, o2)])
+                neighboring_sg.append([sg_neighbor, "%s->%s" % (b1, b2)])
     return neighboring_sg
 
+def graph_search(sg_from, sg_to, hash_func):
+    a_q = queue.Queue()
+    visited = {}
+    visited[hash_func(sg_from)] = True
+    a_q.put(sg_from)
+    path = {}
+    while not a_q.empty():
+        v = a_q.get()
+        if hash_func(v) == hash_func(sg_to):
+            return v, path
+        for w, action in action_model(v):
+            if hash_func(w) not in visited:
+                visited[hash_func(w)] = True
+                a_q.put(w)
+                path[hash_func(w)] = (hash_func(v), action)
+    return None
+
+def recon_path(path, v, root):
+    act = []
+    current = v
+    res = []
+
+    while current != root:
+        res.append(current)
+        current, a = path[current]
+        act.append(a)
+    res.append(root)
+    return res, act
+
 def plan():
+    root_dir = "/home/sontung/thesis/photorealistic-blocksworld/blocks-4-3/image"
     test_data = PBW_3D(train_size=1.0)
     sg2behind = test_data.json2im["sg2behind"]
+    nb_plans = 3
+    for n in range(nb_plans):
+        while True:
+            sg_from = random.choice(list(test_data.json2im.values()))[0]
+            sg_to = random.choice(list(test_data.json2im.values()))[0]
+            print(sg2behind[test_data.hash_sg(sg_from)][-1], "to",
+                  sg2behind[test_data.hash_sg(sg_to)][-1])
+            goal, path = graph_search(sg_from, sg_to, test_data.hash_sg)
+            state_path, actions = recon_path(path, test_data.hash_sg(goal),
+                                             test_data.hash_sg(sg_from))
+            if len(actions) > 3:
+                im_list = []
+                state_path.reverse()
 
-    for sample in test_data:
-        sg, obj_names, front_masks, behind_masks, behind_objects, \
-        sg_n1, sg_n2, im_name, front_masks_name, behind_masks_name = sample
-        print(im_name, sg)
-        sg_neighbors = action_model(sg)
-        for sg_n, info in sg_neighbors:
-            try:
-                _, _, im_n = sg2behind[test_data.hash_sg(sg_n)]
-            except KeyError:
-                print("wrong", sg_n)
-                print(info)
-                sys.exit()
-            print("   ", im_n)
-        break
+                for state in state_path:
+                    print(sg2behind[state][-1])
+                    im_list.append("%s/%s" % (root_dir, sg2behind[state][-1]))
+                visualize_plan(im_list, name="solution%d" % n)
+                break
 
-plan()
+test_sg_pred()
