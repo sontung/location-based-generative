@@ -1,4 +1,4 @@
-# SSL of scene graph representation
+# SSL of scene graph representation [[video]](https://youtu.be/JZ4FepUo6TY)
 
 ## How to clone
 ````
